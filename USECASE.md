@@ -29,8 +29,6 @@ sendSecureMessage(patientId, message); // Sends message to patient portal
 flagForFollowUp(patientId, reason); // Flags chart for nurse review
 ```
 
----
-
 ## Traditional Tool Calling
 
 ### Turn 1
@@ -66,8 +64,6 @@ flagForFollowUp(patientId, reason); // Flags chart for nurse review
 
 **Tokens now**: 4,500 + 85,000 (patient data) = **89,500 tokens**
 
----
-
 ### Turn 2
 
 **AI scans the 847 patients in context**, tries to identify diabetic ones (127 patients).
@@ -90,8 +86,6 @@ flagForFollowUp(patientId, reason); // Flags chart for nurse review
 
 **Tokens now**: 89,500 + 2,500 = **92,000 tokens**
 
----
-
 ### Turn 3
 
 **AI decides**: "P001 had A1C in March, that's recent. Check next diabetic patient."
@@ -102,8 +96,6 @@ flagForFollowUp(patientId, reason); // Flags chart for nurse review
 
 **Tokens now**: 92,000 + 2,500 = **94,500 tokens**
 
----
-
 ### Turns 4–129
 
 Repeat for remaining 125 diabetic patients. Each turn:
@@ -113,8 +105,6 @@ Repeat for remaining 125 diabetic patients. Each turn:
 - Gets lab results back, adds to context
 
 **Tokens after checking all diabetic patients**: ~420,000 tokens
-
----
 
 ### Turns 130–152
 
@@ -140,8 +130,6 @@ Repeat for remaining 125 diabetic patients. Each turn:
 
 _... repeat 21 more times_
 
----
-
 ### Traditional Approach: Final Tally
 
 | Metric                   | Value                                     |
@@ -151,8 +139,6 @@ _... repeat 21 more times_
 | Cost (at $15/1M tokens)  | ~$6.75                                    |
 | Data sent to AI provider | All 847 patient records + all lab results |
 | Filtering accuracy       | AI scans list manually (can miss entries) |
-
----
 
 ## Codecall Approach
 
@@ -225,8 +211,6 @@ return {
 };
 ```
 
----
-
 ### Sandbox Executes
 
 All of this happens **inside the sandbox**, not through the AI:
@@ -237,8 +221,6 @@ All of this happens **inside the sandbox**, not through the AI:
 4. Identifies 23 patients needing reminders
 5. Sends 23 reminders
 6. Returns only the summary
-
----
 
 ### AI Receives Final Result
 
@@ -254,8 +236,6 @@ All of this happens **inside the sandbox**, not through the AI:
 
 > "Done! I found 127 diabetic patients in the system. 23 of them haven't had an A1C test in the past 6 months, so I sent each of them an appointment reminder."
 
----
-
 ### Codecall Approach: Final Tally
 
 | Metric                   | Value              |
@@ -265,8 +245,6 @@ All of this happens **inside the sandbox**, not through the AI:
 | Cost (at $15/1M tokens)  | ~$0.04             |
 | Data sent to AI provider | Only final summary |
 | Filtering accuracy       | 100% (code)        |
-
----
 
 ## Side-by-Side Comparison
 
