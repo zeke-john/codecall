@@ -105,7 +105,7 @@ One inference pass. ~2,000 tokens. 98.7% reduction.
 
 1. **SDK Generator**: Converts MCP server definitions and tool schemas into typed TypeScript SDKs that models can explore and use
 2. **Sandbox Runtime**: Executes agent-generated code in an isolated environment (configurable: local, Daytona, Cloudflare Workers, etc.)
-3. **Result Handler**: Filters, transforms, and sanitizes outputs before they enter the model's context
+3. **Result Handler**: Checks for errors and retries, else then sends the output to the llm as context
 
 ### The Flow
 
@@ -114,7 +114,7 @@ One inference pass. ~2,000 tokens. 98.7% reduction.
 2. Agent explores available SDKs (file tree of typed functions)
 3. Agent writes TypeScript code to accomplish task
 4. Codecall executes code in sandbox
-5. Only final/filtered results return to agent context
+5. Only final results return to agent context
 6. Agent continues or completes
 ```
 
@@ -271,7 +271,7 @@ So for complex workflows where you need to validate intermediate results, we nee
 1. **Optimistic Execution**: Codecall tries to run the agent's generated code.
 2. **Failure Capture**: If the code throws an error, we capture the full execution trace (inputs, outputs, and the specific error).
 3. **Feedback Loop**: We feed this trace back to the model immediately.
-4. **Correction**: The model sees exactly where and why it failed, adjusts its approach, and retries the remainder of the task.
+4. **Correction**: The model sees exactly where and why it failed, adjusts its approach, and retries keeping the main task in mind.
 
 ### Example
 
@@ -463,7 +463,21 @@ In `USECASES.md` we walk through a hypothetical medical records agent, and handl
 
 ## Roadmap
 
-wip, check back soon! (feel free to add to here)
+v0.1 - Getting the initial setup ->
+
+Converting tool definitions from an mcp server to a typed typescript file tree that mirrors the tool namespaces and exposes each tool as a typed function wrapper, then writing that generated sdk to a `generated/` directory and producing a fileTree summary string that can be shown to a model later.
+
+Standing up a local, secure deno sandbox runtime that can load the generated sdk and execute arbitrary user provided typescript in isolation, with locked down permissions by default, and a single controlled bridge back to the node process for tool invocation.
+
+Implementing the node to deno bridge layer so sdk wrapper calls from inside the sandbox are forwarded to the node orchestrator, which executes the real mcp tool call against the connected server and returns only the tool result back to the sandbox.
+
+Defining the minimal v0.1 execution contract: given mcp connection info and a code string, run the code in the sandbox, capture stdout, progress events, tool call traces, and the final return value, then return a single normalized result object to the caller.
+
+(Bigger picture growth)
+
+Once v0.1 is working, the same interfaces scale by swapping the sandbox backend from local deno to remote isolates, and so and agent...
+
+wip, check back soon!
 
 ## Contributing
 
@@ -473,7 +487,7 @@ Please feel free to open an issue, create pull requests, and leave feedback & re
 
 ## Acknowledgements
 
-This project builds on ideas, critiques, and implementations from the community, and is directly inspired from the below:
+This project builds on ideas and implementations from the community, and is directly inspired from the below:
 
 #### Videos
 
