@@ -320,6 +320,105 @@ return weather;
 
 This removes the need for tracking every intermediate step, instead we let the runtime prove what works and what doesn't, using the error logs as deterministic feedback for the model to fix its own mistakes until it works
 
+## User-facing Progress Updates
+
+Codecall runs code in one shot, but you still want user-facing intermediate updates. The sandbox exposes a simple `progress()` helper and can also auto-log tool calls.
+
+### Using `progress()` in Agent Code
+
+```typescript
+const SIX_MONTHS_AGO = new Date();
+SIX_MONTHS_AGO.setMonth(SIX_MONTHS_AGO.getMonth() - 6);
+
+progress({ step: "Loading patients..." });
+const patients = await tools.patients.getPatients();
+
+const diabeticPatients = patients.filter((p) =>
+  p.conditions.includes("diabetes")
+);
+progress({
+  step: "Filtered diabetic patients",
+  count: diabeticPatients.length,
+});
+
+const needsReminder: typeof patients = [];
+
+for (let i = 0; i < diabeticPatients.length; i++) {
+  const patient = diabeticPatients[i];
+
+  progress({
+    step: "Checking lab results",
+    current: i + 1,
+    total: diabeticPatients.length,
+    patient: patient.name,
+  });
+
+  const labs = await tools.records.getLabResults(patient.id);
+  const recentA1C = labs.find(
+    (lab) => lab.test === "A1C" && new Date(lab.date) > SIX_MONTHS_AGO
+  );
+
+  if (!recentA1C) {
+    needsReminder.push(patient);
+  }
+}
+
+progress({
+  step: "Sending reminders",
+  total: needsReminder.length,
+});
+
+for (let i = 0; i < needsReminder.length; i++) {
+  const patient = needsReminder[i];
+
+  progress({
+    step: "Sending reminder",
+    current: i + 1,
+    total: needsReminder.length,
+    patient: patient.name,
+  });
+
+  await tools.communications.sendAppointmentReminder(
+    patient.id,
+    `Hi ${
+      patient.name.split(" ")[0]
+    }, you're due for your A1C test. Please schedule an appointment.`
+  );
+}
+
+return {
+  totalDiabetic: diabeticPatients.length,
+  remindersSent: needsReminder.length,
+};
+```
+
+### Sandbox-side Progress Streaming
+
+```typescript
+const codecall = new CodeCall({
+  tools,
+  sandbox: "local",
+  onProgress: (event) => {
+    // Stream progress to your UI or logs
+    // event can be user-defined progress() data or auto tool-call logs
+    ui.showProgress(event);
+  },
+});
+```
+
+In your system prompt, you can nudge the model to use `progress()`:
+
+```text
+When writing code, call progress(...) at meaningful milestones so the user
+can see what is happening. For example:
+
+  progress("Loading data...");
+  progress({ step: "Processing", current: i, total });
+  progress({ step: "Sending emails", done: count });
+```
+
+This keeps the UX of a "step-by-step" agent, while still getting the cost and speed benefits of single-pass execution.
+
 ## Comparison
 
 | Aspect                | Traditional Tool Calling   | Codecall                      |
@@ -347,7 +446,7 @@ That's a 12% improvement just from language choice. TypeScript also gives you:
 
 ## Real World Example
 
-See the difference in action. In `USECASE.md`, we walk through a hypothetical medical records agent handling the same task with both approaches:
+See the difference in action. In `USECASES.md`, we walk through a hypothetical medical records agent handling the same task with both approaches:
 
 **Task**: "Find all diabetic patients who haven't had an A1C test in the last 6 months and send them appointment reminders"
 
@@ -358,6 +457,8 @@ See the difference in action. In `USECASE.md`, we walk through a hypothetical me
 | Cost                    | $6.75       | $0.04        |
 | Time                    | ~3-6 min    | ~3-30 sec    |
 | Sensitive data exposure | All records | Summary Only |
+
+Also an example of how it would work in an multi turn conversation, going back and forth sending messages and maintaining context.
 
 [Read the full breakdown →](./USECASE.md)
 

@@ -257,3 +257,248 @@ All of this happens **inside the sandbox**, not through the AI:
 | **Filtering accuracy**    | Model-dependent    | 100% (code)      |
 
 **Result**: 99.4% token reduction, 170x cheaper, MUCH faster, and sensitive patient data never leaves your infra
+
+---
+
+## Multi-Turn Conversations
+
+Codecall works exactly like a normal agent for back-and-forth conversations. Each user message triggers a new code execution. The AI still sees conversation history and can ask clarifying questions.
+
+### The Scenario
+
+**Agent**: Same medical records assistant  
+**User wants to explore the data and make decisions based on what they find**
+
+### Turn 1
+
+**User**: "How many diabetic patients do we have?"
+
+**AI writes code**:
+
+```typescript
+const patients = await tools.patients.getPatients();
+const diabetic = patients.filter((p) => p.conditions.includes("diabetes"));
+
+return {
+  total: patients.length,
+  diabetic: diabetic.length,
+  percentage: ((diabetic.length / patients.length) * 100).toFixed(1),
+};
+```
+
+**Sandbox returns**:
+
+```typescript
+{ "total": 847, "diabetic": 127, "percentage": "15.0" }
+```
+
+**AI responds**: "You have 847 total patients, 127 of which are diabetic (15.0%)."
+
+### Turn 2
+
+**User**: "Which ones haven't visited in over a year?"
+
+**AI writes code**:
+
+```typescript
+const ONE_YEAR_AGO = new Date();
+ONE_YEAR_AGO.setFullYear(ONE_YEAR_AGO.getFullYear() - 1);
+
+const patients = await tools.patients.getPatients();
+const diabetic = patients.filter((p) => p.conditions.includes("diabetes"));
+
+const needsVisit = [];
+
+for (const patient of diabetic) {
+  const visits = await tools.records.getVisitHistory(patient.id);
+  const lastVisit = visits.sort(
+    (a, b) => new Date(b.date) - new Date(a.date)
+  )[0];
+
+  if (!lastVisit || new Date(lastVisit.date) < ONE_YEAR_AGO) {
+    needsVisit.push({
+      name: patient.name,
+      lastVisit: lastVisit?.date || "Never",
+    });
+  }
+}
+
+return {
+  count: needsVisit.length,
+  patients: needsVisit,
+};
+```
+
+**Sandbox returns**:
+
+```typescript
+{
+  "count": 34,
+  "patients": [
+    { "name": "Mike Chen", "lastVisit": "2024-08-15" },
+    { "name": "Lisa Park", "lastVisit": "2024-06-02" },
+    { "name": "Tom Wilson", "lastVisit": "Never" },
+    // ... 31 more
+  ]
+}
+```
+
+**AI responds**: "34 diabetic patients haven't visited in over a year. Here's the list: Mike Chen (last visit Aug 2024), Lisa Park (June 2024), Tom Wilson (never visited)..."
+
+### Turn 3
+
+**User**: "Yikes, Tom never visited? What's his info?"
+
+**AI writes code**:
+
+```typescript
+const patient = await tools.patients.searchPatients("Tom Wilson");
+const tom = patient[0];
+
+const medications = await tools.records.getMedications(tom.id);
+const diagnoses = await tools.records.getDiagnoses(tom.id);
+
+return {
+  name: tom.name,
+  email: tom.email,
+  phone: tom.phone,
+  conditions: tom.conditions,
+  diagnoses: diagnoses,
+  currentMedications: medications.filter((m) => m.active),
+};
+```
+
+**Sandbox returns**:
+
+```typescript
+{
+  "name": "Tom Wilson",
+  "email": "tom.wilson@email.com",
+  "phone": "555-0123",
+  "conditions": ["diabetes", "obesity"],
+  "diagnoses": [
+    { "code": "E11.9", "description": "Type 2 diabetes without complications" },
+    { "code": "E66.9", "description": "Obesity, unspecified" }
+  ],
+  "currentMedications": [
+    { "name": "Metformin", "dosage": "500mg", "frequency": "2x daily" }
+  ]
+}
+```
+
+**AI responds**: "Tom Wilson has Type 2 diabetes and obesity. He's on Metformin 500mg twice daily but has never come in for a visit. His contact: tom.wilson@email.com, 555-0123."
+
+### Turn 4
+
+**User**: "Flag him for urgent follow-up and send him a message to schedule ASAP"
+
+**AI writes code**:
+
+```typescript
+const patient = await tools.patients.searchPatients("Tom Wilson");
+const tom = patient[0];
+
+await tools.charts.flagForFollowUp(
+  tom.id,
+  "URGENT: Diabetic patient on Metformin with no visit history. Needs immediate appointment."
+);
+
+await tools.communications.sendSecureMessage(
+  tom.id,
+  `Hi Tom, this is ${clinicName}. We noticed you haven't been in for a check-up yet. ` +
+    `As a diabetic patient on medication, regular monitoring is important. ` +
+    `Please call us at 555-CLINIC or reply to this message to schedule an appointment as soon as possible.`
+);
+
+return {
+  flagged: true,
+  messageSent: true,
+  patientId: tom.id,
+};
+```
+
+**Sandbox returns**:
+
+```typescript
+{ "flagged": true, "messageSent": true, "patientId": "P089" }
+```
+
+**AI responds**: "Done. I've flagged Tom Wilson for urgent follow-up and sent him a secure message asking him to schedule an appointment ASAP."
+
+### Turn 5
+
+**User**: "Actually, do this for all 34 of those patients who haven't visited"
+
+**AI writes code**:
+
+```typescript
+const ONE_YEAR_AGO = new Date();
+ONE_YEAR_AGO.setFullYear(ONE_YEAR_AGO.getFullYear() - 1);
+
+const patients = await tools.patients.getPatients();
+const diabetic = patients.filter((p) => p.conditions.includes("diabetes"));
+
+const flagged = [];
+
+for (const patient of diabetic) {
+  const visits = await tools.records.getVisitHistory(patient.id);
+  const lastVisit = visits.sort(
+    (a, b) => new Date(b.date) - new Date(a.date)
+  )[0];
+
+  if (!lastVisit || new Date(lastVisit.date) < ONE_YEAR_AGO) {
+    await tools.charts.flagForFollowUp(
+      patient.id,
+      `Diabetic patient with no visit in 12+ months. Last visit: ${
+        lastVisit?.date || "Never"
+      }`
+    );
+
+    await tools.communications.sendSecureMessage(
+      patient.id,
+      `Hi ${patient.name.split(" ")[0]}, this is ${clinicName}. ` +
+        `We noticed it's been a while since your last visit. ` +
+        `As a diabetic patient, regular check-ups help us keep you healthy. ` +
+        `Please call us at 555-CLINIC to schedule an appointment.`
+    );
+
+    flagged.push(patient.name);
+  }
+}
+
+return {
+  totalFlagged: flagged.length,
+  totalMessaged: flagged.length,
+  patients: flagged,
+};
+```
+
+**Sandbox returns**:
+
+```typescript
+{
+  "totalFlagged": 34,
+  "totalMessaged": 34,
+  "patients": ["Mike Chen", "Lisa Park", "Tom Wilson", "..."]
+}
+```
+
+**AI responds**: "Done! I've flagged all 34 patients for follow-up and sent each of them a personalized message to schedule an appointment."
+
+## Summary
+
+This was a normal conversation. The user explored data, asked follow-up questions, made decisions, and took action. Codecall handled each turn:
+
+| Turn      | User Intent                  | Traditional Calls | Codecall      |
+| --------- | ---------------------------- | ----------------- | ------------- |
+| 1         | Count diabetic patients      | 1                 | 1 script      |
+| 2         | Find those missing visits    | 128 (1 + 127)     | 1 script      |
+| 3         | Get details on one patient   | 3                 | 1 script      |
+| 4         | Flag and message one patient | 2                 | 1 script      |
+| 5         | Do it for all 34             | 68 (34 x 2)       | 1 script      |
+| **Total** |                              | **202 calls**     | **5 scripts** |
+
+The conversation flow and the user experience are very similar. But behind the scenes:
+
+- Traditional: 202 inference passes, ~450k tokens
+- Codecall: 5 inference passes, ~8k tokens
