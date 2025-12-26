@@ -18,7 +18,7 @@ Every tool definition lives in your system prompt. Connect a few MCP servers and
 GitHub Server:     35 tools  →  ~15,000 tokens
 Slack Server:      11 tools  →  ~8,000 tokens
 Jira Server:       17 tools  →  ~17,000 tokens
-Salesforce Server: 25 tools  →  ~12,000 tokens
+Internal Tools:    25 tools  →  ~12,000 tokens
 ─────────────────────────────────────────────
 Total:             88 tools  →  ~52,000 tokens (before any work happens)
 ```
@@ -120,12 +120,12 @@ One inference pass. ~2,000 tokens. 98.7% reduction.
 
 ## Features
 
-- **TypeScript-first**: Better model performance, full type safety, excellent IDE support
-- **MCP Compatible**: Connect any MCP server, auto-generate typed SDKs
-- **Standard Tools**: Works with regular tool definitions too
-- **Sandbox Execution**: Isolated runtime for agent-generated code
-- **Context Efficiency**: Only return what matters to the model
-- **Privacy**: Intermediate data never hits the model
+- **TypeScript-first**: Better model performance and full type safety
+- **MCP Compatible**: Connect any MCP server and auto generate typed SDKs
+- **Standard Tools**: Works w/ regular tool definitions too
+- **Sandbox Execution**: Isolated runtime for agent generated code
+- **Context Efficiency**: Only returns what matters to the model
+- **Privacy**: Intermediate data doesn't hit the model
 
 ## Installation
 
@@ -318,11 +318,11 @@ const weather = await tools.getWeather({
 return weather;
 ```
 
-This removes the need for tracking every intermediate step, instead we let the runtime prove what works and what doesn't, using the error logs as deterministic feedback for the model to fix its own mistakes until it works
+This removes the need for tracking every intermediate step, instead we let the runtime prove what works and what doesn't, using the error logs as feedback for the model to fix its own mistakes until it works
 
-## User-facing Progress Updates
+## Progress Updates
 
-Codecall runs code in one shot, but you still want user-facing intermediate updates. The sandbox exposes a simple `progress()` helper and can also auto-log tool calls.
+Codecall runs code in one shot, but you still want user-facing intermediate updates. The sandbox exposes a `progress()` helper and can also auto-log tool calls.
 
 ### Using `progress()` in Agent Code
 
@@ -406,7 +406,7 @@ const codecall = new CodeCall({
 });
 ```
 
-In your system prompt, you can nudge the model to use `progress()`:
+In your system prompt, you can tell the model to use `progress()`:
 
 ```text
 When writing code, call progress(...) at meaningful milestones so the user
@@ -417,7 +417,7 @@ can see what is happening. For example:
   progress({ step: "Sending emails", done: count });
 ```
 
-This keeps the UX of a "step-by-step" agent, while still getting the cost and speed benefits of single-pass execution.
+This keeps the UX of a "step by step" agent, while still getting the cost and speed benefits of single-pass execution.
 
 ## Comparison
 
@@ -440,13 +440,12 @@ Anthropic's own benchmarks show Claude Opus 4.1 performs:
 That's a 12% improvement just from language choice. TypeScript also gives you:
 
 - Full type inference for SDK generation
-- Better IDE support for debugging
 - Compile-time validation of tool schemas
 - The model sees types and can use them correctly
 
 ## Real World Example
 
-See the difference in action. In `USECASES.md`, we walk through a hypothetical medical records agent handling the same task with both approaches:
+In `USECASES.md` we walk through a hypothetical medical records agent, and handling the same task with both approaches:
 
 **Task**: "Find all diabetic patients who haven't had an A1C test in the last 6 months and send them appointment reminders"
 
@@ -458,13 +457,13 @@ See the difference in action. In `USECASES.md`, we walk through a hypothetical m
 | Time                    | ~3-6 min    | ~3-30 sec    |
 | Sensitive data exposure | All records | Summary Only |
 
-Also an example of how it would work in an multi turn conversation, going back and forth sending messages and maintaining context.
+\+ Also an example of how it would work in multi-turn conversations, going back and forth sending messages and maintaining context.
 
-[Read the full breakdown →](./USECASE.md)
+[Read the full breakdown →](./USECASES.md)
 
 ## Roadmap
 
-wip :)
+wip, check back soon! (feel free to add to here)
 
 ## Contributing
 

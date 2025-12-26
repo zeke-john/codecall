@@ -1,4 +1,4 @@
-## Real-World Example: Medical Records Agent
+## Real World Example -> Medical Records Agent
 
 To understand the difference, let's walk through the same task using both approaches.
 
@@ -260,7 +260,7 @@ All of this happens **inside the sandbox**, not through the AI:
 
 ---
 
-## Multi-Turn Conversations
+## Multi Turn Conversations
 
 Codecall works exactly like a normal agent for back-and-forth conversations. Each user message triggers a new code execution. The AI still sees conversation history and can ask clarifying questions.
 
