@@ -1,4 +1,4 @@
-## Real World Example -> Medical Records Agent
+# Real World Example (Medical Records Agent)
 
 To understand the difference, let's walk through the same task using both approaches.
 
@@ -258,15 +258,13 @@ All of this happens **inside the sandbox**, not through the AI:
 
 **Result**: 99.4% token reduction, 170x cheaper, MUCH faster, and sensitive patient data never leaves your infra
 
----
+# Conversational Example with Context
 
-## Back & Forths in a Conversation
-
-Codecall works exactly like a normal agent for back-and-forth conversations. Each user message triggers a new code execution. The AI still sees conversation history and can ask clarifying questions.
+Codecall also works exactly like a normal agent for back-and-forth conversations. Each user message triggers a new code execution. The AI still sees conversation history and can ask clarifying questions, and so etc.
 
 ### The Scenario
 
-**Agent**: Same medical records assistant  
+**Agent** (Same medical records assistant)
 **User wants to explore the data and make decisions based on what they find**
 
 ### Turn 1
@@ -487,7 +485,7 @@ return {
 
 ## Summary
 
-This was a normal conversation. The user explored data, asked follow-up questions, made decisions, and took action. Codecall handled each turn:
+This was a normal conversation where the user explored data, asked follow-up questions, made decisions, and took action. Codecall handled each turn:
 
 | Turn      | User Intent                  | Traditional Calls | Codecall      |
 | --------- | ---------------------------- | ----------------- | ------------- |

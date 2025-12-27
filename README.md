@@ -1,14 +1,14 @@
 # Codecall
 
-> TypeScript-first Programmatic Tool Calling for AI Agents. Stop wasting tokens and context & Start writing code.
+> An open source Typescript implementation of Programmatic Tool Calling for AI Agents, based directly on `Code Mode` from Cloudflare.
 
-Codecall changes how agents interact w/ tools by letting them **write and execute code** instead of making individual tool calls that bloat context, massively increase the price, and slow everything down
+Codecall changes how agents interact with tools by letting them **write and execute code** instead of making individual tool calls that bloat context, massively increase the price, and slow everything down
 
 Works with **MCP servers** and **standard tool definitions**.
 
 ## The Problem
 
-Traditional tool calling is fundamentally broken at scale:
+Traditional tool calling has fundamental architectural issues that get worse at scale:
 
 ### 1. Context Bloat
 
@@ -40,6 +40,8 @@ Traditional approach:
   Total: 150,000+ tokens, 12 inference passes
 ```
 
+The problem also compounds because each tool call adds its output to the context, making every subsequent generation more expensive.
+
 ### 3. Models Are Bad at Data Lookup
 
 Benchmarks show models have a **10-50% failure rate** when searching through large datasets in context. They hallucinate field names, miss entries, and get confused by similar data.
@@ -50,9 +52,17 @@ But you know what has a 0% failure rate?
 users.filter((u) => u.role === "admin");
 ```
 
-### 4. Privacy
+### 4. Models Were Never Trained for Tool Calling
 
-Every intermediate result flows through the model provider. That 10,000 row customer spreadsheet? Now it's in Anthropic's context window.
+The special tokens used for tool calls (`<tool_call>`, `</tool_call>`) are synthetic training data. Models dont have much exposure to the tool calling syntax,and have only seen contrived examples from training sets... but they DO have:
+
+- Millions of lines of real world TypeScript
+- Lots of experience writing code to call APIs
+
+> “Making an LLM perform tasks with tool calling is like putting Shakespeare through a month-long class in Mandarin and then asking him to write a play in it. It’s just not going to be his best work.”  
+> — Cloudflare Engineering
+
+For example, Grok 4 & Gemini 3 were heavily trained on tool calling. Result? They hallucinates tool call XML syntax in the middle of responses, writing the format but not triggering actual execution. The model “knows” the syntax exists but doesn’t use it correctly.
 
 ## The Solution
 
@@ -72,152 +82,15 @@ return { updated: admins.length };
 
 One inference pass. ~2,000 tokens. 98.7% reduction.
 
-## How Codecall Works
+## How Codecall Works (WIP)
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Your Agent                               │
-└─────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                         Codecall                                 │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │  SDK Generator  │  │ Sandbox Runtime │  │ Result Handler  │  │
-│  │                 │  │                 │  │                 │  │
-│  │ MCP Server ────►│  │ Executes agent- │  │ Filters output  │  │
-│  │ Tool Defs ─────►│  │ generated code  │  │ before context  │  │
-│  │       │         │  │ in isolation    │  │                 │  │
-│  │       ▼         │  │                 │  │                 │  │
-│  │  TypeScript     │  │                 │  │                 │  │
-│  │  SDK + Types    │  │                 │  │                 │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-                                │
-                    ┌───────────┴───────────┐
-                    ▼                       ▼
-            ┌─────────────┐         ┌─────────────┐
-            │ MCP Servers │         │ Local Tools │
-            └─────────────┘         └─────────────┘
-```
+Instead of exposing tools directly to the LLM for it to call, Codecall:
 
-### Architecture
-
-1. **SDK Generator**: Converts MCP server definitions and tool schemas into typed TypeScript SDKs that models can explore and use
-2. **Sandbox Runtime**: Executes agent-generated code in an isolated environment (configurable: local, Daytona, Cloudflare Workers, etc.)
-3. **Result Handler**: Checks for errors and retries, else then sends the output to the llm as context
-
-### The Flow
-
-```
-1. Agent receives task
-2. Agent explores available SDKs (file tree of typed functions)
-3. Agent writes TypeScript code to accomplish task
-4. Codecall executes code in sandbox
-5. Only final results return to agent context
-6. Agent continues or completes
-```
-
-## Features
-
-- **TypeScript-first**: Better model performance and full type safety
-- **MCP Compatible**: Connect any MCP server and auto generate typed SDKs
-- **Standard Tools**: Works w/ regular tool definitions too
-- **Sandbox Execution**: Isolated runtime for agent generated code
-- **Context Efficiency**: Only returns what matters to the model
-- **Privacy**: Intermediate data doesn't hit the model
-
-## Installation
-
-```bash
-npm install codecall
-```
-
-## Quick Start
-
-### With MCP Servers
-
-```typescript
-import { CodeCall } from "codecall";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-
-// Connect your MCP servers
-const githubMcp = new Client({ name: "github", version: "1.0.0" });
-await githubMcp.connect(githubTransport);
-
-const slackMcp = new Client({ name: "slack", version: "1.0.0" });
-await slackMcp.connect(slackTransport);
-
-// Create codecall instance
-const codecall = new CodeCall({
-  mcpClients: [githubMcp, slackMcp],
-  sandbox: "local", // or 'daytona', 'cloudflare', custom
-});
-
-// Generate SDKs (model sees these as explorable file trees)
-const sdkContext = await codecall.generateSDKContext();
-
-// Use with your agent
-const response = await agent.run({
-  systemPrompt: `
-    You have access to tool SDKs. Write TypeScript code to accomplish tasks.
-    
-    Available SDKs:
-    ${sdkContext.fileTree}
-    
-    To execute code, use the execute_code tool.
-  `,
-  tools: [codecall.getExecuteTool()],
-  message: userMessage,
-});
-```
-
-### With Standard Tool Definitions
-
-```typescript
-import { CodeCall, defineTool } from "codecall";
-
-// Define your tools
-const tools = [
-  defineTool({
-    name: "getUsers",
-    description: "Fetch all users from the database",
-    parameters: z.object({
-      limit: z.number().optional(),
-    }),
-    returns: z.array(
-      z.object({
-        id: z.string(),
-        name: z.string(),
-        role: z.enum(["admin", "user", "guest"]),
-        email: z.string(),
-      })
-    ),
-    execute: async ({ limit }) => {
-      return db.users.findMany({ take: limit });
-    },
-  }),
-
-  defineTool({
-    name: "updateUser",
-    description: "Update a user record",
-    parameters: z.object({
-      id: z.string(),
-      data: z.object({
-        role: z.enum(["admin", "user", "guest"]).optional(),
-        name: z.string().optional(),
-      }),
-    }),
-    returns: z.object({ success: z.boolean() }),
-    execute: async ({ id, data }) => {
-      await db.users.update({ where: { id }, data });
-      return { success: true };
-    },
-  }),
-];
-
-const codecall = new CodeCall({ tools });
-```
+- Converts your tools into TypeScript SDK files
+- Shows the model a file tree of available functions (just like a codebase)
+- Lets the model write code to accomplish the task
+- Executes that code in a sandbox with access to your actual tools as functions
+- Returns only the final results to the model
 
 ### SDK File Tree (What the Model Sees)
 
@@ -260,18 +133,18 @@ export async function getUsers(input: GetUsersInput): Promise<User[]> {
 }
 ```
 
+(more to come here)
+
 ## Handling Errors
 
-Real-world API data is messy. If `getWeather()` returns an unexpected error (e.g., "City not found") or a format the agent didn't expect, a pre-written script will fail
-
-So for complex workflows where you need to validate intermediate results, we need to address and handle the concern that pre-planned code can (and will) fail with messy real-world data
+Real world API data is messy so pre-written code can and will fail. Codecall handles this with an automatic recovery loop:
 
 ### The Recovery Loop
 
-1. **Optimistic Execution**: Codecall tries to run the agent's generated code.
-2. **Failure Capture**: If the code throws an error, we capture the full execution trace (inputs, outputs, and the specific error).
-3. **Feedback Loop**: We feed this trace back to the model immediately.
-4. **Correction**: The model sees exactly where and why it failed, adjusts its approach, and retries keeping the main task in mind.
+1. **Optimistic Execution**: Codecall tries to run the agent's generated code
+2. **Failure Capture**: If the code throws an error, we capture the full execution trace (inputs, outputs, and the specific error)
+3. **Feedback Loop**: We feed this trace back to the model
+4. **Correction**: The model sees exactly where and why it failed, adjusts its approach, and retries keeping the main task in mind
 
 ### Example
 
@@ -322,9 +195,19 @@ This removes the need for tracking every intermediate step, instead we let the r
 
 ## Progress Updates
 
-Codecall runs code in one shot, but you still want user-facing intermediate updates. The sandbox exposes a `progress()` helper and can also auto-log tool calls.
+Codecall runs code in one shot, but you would still most likely want some user facing intermediate updates between the start and end of a equest. The sandbox exposes a `progress()` helper that can log the steps its taking
 
-### Using `progress()` in Agent Code
+So for example, in your system prompt you can tell the model to use `progress()`:
+
+```text
+When writing code, use progress(...) to show meaningful updates. can see what is happening. For example:
+
+  progress("Loading data...");
+  progress({ step: "Processing", current: i, total });
+  progress({ step: "Sending emails", done: count });
+```
+
+Agent Code Example
 
 ```typescript
 const SIX_MONTHS_AGO = new Date();
@@ -392,43 +275,7 @@ return {
 };
 ```
 
-### Sandbox-side Progress Streaming
-
-```typescript
-const codecall = new CodeCall({
-  tools,
-  sandbox: "local",
-  onProgress: (event) => {
-    // Stream progress to your UI or logs
-    // event can be user-defined progress() data or auto tool-call logs
-    ui.showProgress(event);
-  },
-});
-```
-
-In your system prompt, you can tell the model to use `progress()`:
-
-```text
-When writing code, call progress(...) at meaningful milestones so the user
-can see what is happening. For example:
-
-  progress("Loading data...");
-  progress({ step: "Processing", current: i, total });
-  progress({ step: "Sending emails", done: count });
-```
-
-This keeps the UX of a "step by step" agent, while still getting the cost and speed benefits of single-pass execution.
-
-## Comparison
-
-| Aspect                | Traditional Tool Calling   | Codecall                      |
-| --------------------- | -------------------------- | ----------------------------- |
-| Token usage           | 150,000+ for complex tasks | ~2,000 (98%+ reduction)       |
-| Inference passes      | One per tool call          | One for code generation       |
-| Data lookup accuracy  | 50-90% (model dependent)   | 100% (code is deterministic)  |
-| Intermediate privacy  | All data hits model        | Stays in sandbox              |
-| Multi-step operations | N round trips              | Single execution              |
-| Model training fit    | Post-training fine-tune    | Pre-training (vast code data) |
+This keeps the UX of a "step by step" agent with user facing intermediate updates, while still getting the cost and speed benefits of single-pass execution.
 
 ## Why TypeScript?
 
@@ -440,7 +287,7 @@ Anthropic's own benchmarks show Claude Opus 4.1 performs:
 That's a 12% improvement just from language choice. TypeScript also gives you:
 
 - Full type inference for SDK generation
-- Compile-time validation of tool schemas
+- Compile time validation of tool schemas
 - The model sees types and can use them correctly
 
 ## Real World Example
@@ -467,26 +314,25 @@ wip
 
 ## Contributing
 
-We welcome and encourage contributions from the community :)
+We welcome contributions! Please Feel free to:
 
-Please feel free to open an issue, create pull requests, and leave feedback & requests!
+- Open issues for bugs or feature requests
+- Submit PRs for improvements
+- Share your use cases and feedback
 
 ## Acknowledgements
 
-This project builds on ideas and implementations from the community, and is directly inspired from the below:
+This project builds on ideas from the community and is directly inspired by:
 
 #### Videos
 
 - Yannic Kilcher – [What Cloudflare's code mode misses about MCP and tool calling](https://www.youtube.com/watch?v=0bpYCxv2qhw)
-- Theo – [Anthropic admits that MCP sucks](https://www.youtube.com/watch?v=1piFEKA9XL0&t=201s)
-- Theo – [Anthropic is trying SO hard to fix MCP...](https://www.youtube.com/watch?v=hPPTrsUzLA8&t=2s)
-- Theo – [MCP is the wrong abstraction](https://www.youtube.com/watch?v=bAYZjVAodoo&t=2s)
+- Theo – [Anthropic admits that MCP sucks](https://www.youtube.com/watch?v=1piFEKA9XL0&t=201s) & [Anthropic is trying SO hard to fix MCP...](https://www.youtube.com/watch?v=hPPTrsUzLA8&t=2s)
 
 #### Articles
 
 - Cloudflare – [Code mode: the better way to use MCP](https://blog.cloudflare.com/code-mode/)
-- Anthropic – [Code execution with MCP: building more efficient AI agents](https://www.anthropic.com/engineering/code-execution-with-mcp)
-- Anthropic – [Introducing advanced tool use on the Claude developer platform](https://www.anthropic.com/engineering/advanced-tool-use)
+- Anthropic – [Code execution with MCP: building more efficient AI agents](https://www.anthropic.com/engineering/code-execution-with-mcp) & [Introducing advanced tool use on the Claude developer platform](https://www.anthropic.com/engineering/advanced-tool-use)
 - Medium - [Your Agent Is Wasting Money On Tools. Code Execution With MCP Fixes It.](https://medium.com/genaius/your-agent-is-wasting-money-on-tools-code-execution-with-mcp-fixes-it-5c8d7b177bad)
 
 ## License
