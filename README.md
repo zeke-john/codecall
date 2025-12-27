@@ -463,21 +463,7 @@ In `USECASES.md` we walk through a hypothetical medical records agent, and handl
 
 ## Roadmap
 
-v0.1 - Getting the initial setup ->
-
-Converting tool definitions from an mcp server to a typed typescript file tree that mirrors the tool namespaces and exposes each tool as a typed function wrapper, then writing that generated sdk to a `generated/` directory and producing a fileTree summary string that can be shown to a model later.
-
-Standing up a local, secure deno sandbox runtime that can load the generated sdk and execute the agent typescript in isolation, and with a single controlled bridge back to the node process for tool invocation.
-
-Implementing the node to deno bridge layer so sdk wrapper calls from inside the sandbox are forwarded to the node orchestrator, which executes the real mcp tool call against the connected server and returns only the tool result back to the sandbox.
-
-Defining the minimal v0.1 execution contract: given mcp connection info and a code string, run the code in the sandbox, capture stdout, progress events, tool call traces, and the final return value, then return a single normalized result object to the caller.
-
-(Bigger picture growth)
-
-Once v0.1 is working, the same interfaces scale by swapping the sandbox backend from local deno to remote isolates, and also we can implement this into an agent by giving them access to the fileTree w/ a tool to execute_code(code: string) so they can write TypeScript against the SDK to perform action based on user requests in a single inference pass.
-
-wip, check back soon!
+wip
 
 ## Contributing
 
