@@ -1,8 +1,8 @@
 # Codecall
 
-> An open source Typescript implementation of Programmatic Tool Calling for AI Agents, based directly on `Code Mode` from Cloudflare.
+> An open source Typescript implementation of Programmatic Tool Calling for AI Agents.
 
-Codecall changes how agents interact with tools by letting them **write and execute code** instead of making individual tool calls that bloat context, massively increase the price, and slow everything down
+Codecall changes how agents interact with tools by letting them **write and execute code** instead of making individual tool calls that bloat context, increase the price, and slow everything down
 
 Works with **MCP servers** and **standard tool definitions**.
 
@@ -15,12 +15,11 @@ Traditional tool calling has fundamental architectural issues that get worse at 
 Every tool definition lives in your system prompt. Connect a few MCP servers and you're burning tens of thousands of tokens before the conversation even starts.
 
 ```
-GitHub Server:     35 tools  →  ~15,000 tokens
-Slack Server:      11 tools  →  ~8,000 tokens
-Jira Server:       17 tools  →  ~17,000 tokens
-Internal Tools:    25 tools  →  ~12,000 tokens
+GitHub Server:     85 tools  →  ~52,000 tokens
+Slack Server:      11 tools  →  ~24,000 tokens
+Internal Tools:    6 tools  →  ~12,000 tokens
 ─────────────────────────────────────────────
-Total:             88 tools  →  ~52,000 tokens (before any work happens)
+Total:             102 tools  →  ~88,000 tokens (before any work happens)
 ```
 
 ### 2. Inference Overhead
@@ -54,15 +53,19 @@ users.filter((u) => u.role === "admin");
 
 ### 4. Models Were Never Trained for Tool Calling
 
-The special tokens used for tool calls (`<tool_call>`, `</tool_call>`) are synthetic training data. Models dont have much exposure to the tool calling syntax,and have only seen contrived examples from training sets... but they DO have:
+The special tokens used for tool calls (`<tool_call>`, `</tool_call>`) are synthetic training data. Models dont have much exposure to the tool calling syntax, and have only seen contrived examples from training sets... but they DO have:
 
 - Millions of lines of real world TypeScript
 - Lots of experience writing code to call APIs
 
 > “Making an LLM perform tasks with tool calling is like putting Shakespeare through a month-long class in Mandarin and then asking him to write a play in it. It’s just not going to be his best work.”  
-> — Cloudflare Engineering
+> — [Cloudflare Engineering](https://blog.cloudflare.com/code-mode/)
 
-For example, Grok 4 & Gemini 3 were heavily trained on tool calling. Result? They hallucinates tool call XML syntax in the middle of responses, writing the format but not triggering actual execution. The model “knows” the syntax exists but doesn’t use it correctly.
+For example, Grok 4 & Gemini 3 were heavily trained on tool calling. Result? They hallucinate tool call XML syntax in the middle of responses, writing the format but not triggering actual execution. The model “knows” the syntax exists but doesn’t use it correctly.
+
+### 5. Privacy
+
+Every intermediate result flows through the model provider. That 10,000 row customer spreadsheet? That internal employee database? All of it goes into the model's context window and through the API provider's infrastructure.
 
 ## The Solution
 
@@ -84,15 +87,21 @@ One inference pass. ~2,000 tokens. 98.7% reduction.
 
 ## How Codecall Works (WIP)
 
-Instead of exposing tools directly to the LLM for it to call, Codecall:
+Instead of exposing every tool directly to the LLM for it to call, Codecall:
 
-- Converts your tools into TypeScript SDK files
-- Shows the model a file tree of available functions (just like a codebase)
+- Converts your MCP definitions into TypeScript SDK files (types + function signatures)
+- Shows the model a directory tree of available files
+- Allows the model to selectively read SDK files to understand types and APIs
 - Lets the model write code to accomplish the task
-- Executes that code in a sandbox with access to your actual tools as functions
-- Returns only the final results to the model
+- Executes that code in a deno sandbox with access to your actual tools as functions
+- Returns the execution result back to the same model in a 2nd request
+- Lets the model produce the final user-facing response
+
+Codecall uses two model requests per user turn: one to write code, and one to explain the execution result.
 
 ### SDK File Tree (What the Model Sees)
+
+At the start of every request, the model is shown only the file tree, not the contents of each file.
 
 ```
 /tools
@@ -111,11 +120,24 @@ Instead of exposing tools directly to the LLM for it to call, Codecall:
     ...
 ```
 
-Each file contains typed function signatures:
+This gives the model a high-level map of what capabilities exist without bloating the prompt with thousands of lines of schemas.
+
+### Reading SDK Files (Discovery Phase)
+
+When the model needs to understand how a specific tool works, it can explicitly request the contents of a file using a built in `readFile` tool:
+
+```typescript
+readFile({
+  module: "db",
+  name: "getUsers",
+});
+```
+
+This returns the entire contents of that SDK file, and each file contains type definitions for that tool, for example:
 
 ```typescript
 // /tools/db/getUsers.ts
-import { call } from "codecall";
+// SDK stub for tool: "db.getUsers"
 
 export interface GetUsersInput {
   limit?: number;
@@ -133,11 +155,95 @@ export async function getUsers(input: GetUsersInput): Promise<User[]> {
 }
 ```
 
-(more to come here)
+The model can read only the files it needs which it can infer from the filenames, just like a developer opening files in an editor, instead of having every tool definition injected into context upfront.
 
-## Handling Errors
+This keeps prompts small while still giving the model precise, typed knowledge of each tool before it writes code.
 
-Real world API data is messy so pre-written code can and will fail. Codecall handles this with an automatic recovery loop:
+### Writing Code (Invocation Phase)
+
+After reading the relevant SDK files, the model writes a single TypeScript program like:
+
+```typescript
+const patients = await tools.patients.getPatients();
+await tools.communications.sendSecureMessage(patientId, "...");
+return { ok: true };
+```
+
+The SDK files are for the model to know what to write BUT they are NOT what makes tools actually run.
+
+They exist purely for type level guidance and discoverability, so they are never imported or executed by the sandbox runtime, and its just for the model to know how it has to write the code for that corresponding tool, and that it knows what to expect.
+
+### How Tool Calls Work at Runtime
+
+When the generated code runs, Codecall injects a real `tools` object into the sandbox.
+
+- `tools` is not a set of local functions, but it's a small runtime bridge provided by Codecall
+- Each call to `tools.*` is forwarded to the real tool implementation
+
+So when the sandbox executes:
+
+```typescript
+await tools.communications.sendSecureMessage(patientId, message);
+```
+
+What actually happens is:
+
+- The sandbox captures the tool name (`"communications.sendSecureMessage"`) and arguments
+- Codecall forwards that request to the connected MCP server using `tools/call`
+- The MCP server executes the real tool
+- The result is returned back to the sandbox
+- The script continues running
+
+From the code’s perspective this behaves exactly like calling a normal async function.
+
+### Code Execution & Sandboxing
+
+When the model finishes writing the TypeScript code, Codecall executes that code inside a fresh, short-lived sandbox. Each sandbox is spun up using Deno and runs the code in isolation. Deno’s security model blocks access to sensitive capabilities unless explicitly allowed.
+
+By default, the sandboxed code has no access to the filesystem, network, environment variables, or system processes. The only way it can interact with the outside world is by calling the tool functions exposed through tools (which are forwarded by Codecall to the MCP server).
+
+Every execution is independent. Retries in the recovery loop run in a new sandbox if it errors, which keeps execution fast, predictable, and easy to reason about while preventing state from leaking between runs.
+
+### Returning Results to the Model (Response Phase)
+
+After the sandbox finishes executing the generated code, Codecall returns the final result object, with the same conversation history as the original user request back to the same model so it can produce a user-facing response.
+
+This happens in a second model request, so the flow looks like this:
+
+1. Code Generation (Request 1)
+
+   - Model sees the tool tree and reads SDK files as needed
+   - Model writes a single TypeScript script to perform what action is needed
+
+2. Sandbox Execution
+
+   - Codecall runs the program in an isolated sandbox
+   - Tools are invoked via `tools.*`
+   - A final result object is produced
+
+3. Response Generation (Request 2)
+   - The result object is sent back to the same model in another request (#2)
+   - The model explains the outcome to the user in natural language, which is the user-facing response
+
+For example, after execution completes:
+
+```typescript
+
+{
+  totalDiabetic: 127,
+  remindersSent: 23,
+  patients: ["Mike Chen", "Lisa Park", "..."]
+}
+
+```
+
+The model receives that result and responds:
+
+> “I found 127 diabetic patients. 23 of them haven’t had an A1C test in the last 6 months, so I sent appointment reminders to each of them.”
+
+## Handling Errors (v2)
+
+Real world API data is messy so pre-written code can (and will) fail. Codecall handles this with an automatic recovery loop:
 
 ### The Recovery Loop
 
@@ -191,11 +297,15 @@ const weather = await tools.getWeather({
 return weather;
 ```
 
-This removes the need for tracking every intermediate step, instead we let the runtime prove what works and what doesn't, using the error logs as feedback for the model to fix its own mistakes until it works
+On failure, Codecall returns the error, full execution trace, the TypeScript code which failed, and the original user request with the main task to the model. The sandbox is destroyed after each run, but the trace is preserved.
 
-## Progress Updates
+The model then rewrites the code (in another request) and Codecall reruns it in a fresh sandbox, retrying until it succeeds or hits a configurable limit (default 3). If the limit is reached, Codecall stops and returns a clear failure.
 
-Codecall runs code in one shot, but you would still most likely want some user facing intermediate updates between the start and end of a equest. The sandbox exposes a `progress()` helper that can log the steps its taking
+Finally, Codecall returns the user response: on success returns the result object from the code, and on failure it explains where and why it failed so we can let the user know.
+
+## Progress Updates (v2)
+
+Codecall runs code in one shot, but you would still most likely want some user facing intermediate updates between the start and end of a request. The sandbox exposes a `progress()` helper that can log the steps it's taking
 
 So for example, in your system prompt you can tell the model to use `progress()`:
 
@@ -290,27 +400,11 @@ That's a 12% improvement just from language choice. TypeScript also gives you:
 - Compile time validation of tool schemas
 - The model sees types and can use them correctly
 
-## Real World Example
-
-In `USECASES.md` we walk through a hypothetical medical records agent, and handling the same task with both approaches:
-
-**Task**: "Find all diabetic patients who haven't had an A1C test in the last 6 months and send them appointment reminders"
-
-|                         | Traditional | Codecall     |
-| ----------------------- | ----------- | ------------ |
-| Inference passes        | 152         | 1            |
-| Tokens                  | ~450,000    | ~2,500       |
-| Cost                    | $6.75       | $0.04        |
-| Time                    | ~3-6 min    | ~3-30 sec    |
-| Sensitive data exposure | All records | Summary Only |
-
-\+ Also an example of how it would work in multi-turn conversations, going back and forth sending messages and maintaining context.
-
-[Read the full breakdown →](./USECASES.md)
-
 ## Roadmap
 
-wip
+WIP, Please check back soon or feel free to add here :)
+
+Still working on how the high level architecture and how everything should work/flow together
 
 ## Contributing
 
