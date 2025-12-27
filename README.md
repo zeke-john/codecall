@@ -171,9 +171,8 @@ await tools.communications.sendSecureMessage(patientId, "...");
 return { ok: true };
 ```
 
-The SDK files are for the model to know what to write BUT they are NOT what makes tools actually run.
-
-They exist purely for type level guidance and discoverability, so they are never imported or executed by the sandbox runtime, and its just for the model to know how it has to write the code for that corresponding tool, and that it knows what to expect.
+SDK files exist only for the model (types + discoverability).
+Runtime execution never imports SDK files, it uses a tools bridge injected by Codecall.
 
 ### How Tool Calls Work at Runtime
 
