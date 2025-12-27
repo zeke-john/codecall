@@ -15,11 +15,11 @@ Traditional tool calling has fundamental architectural issues that get worse at 
 Every tool definition lives in your system prompt. Connect a few MCP servers and you're burning tens of thousands of tokens before the conversation even starts.
 
 ```
-GitHub Server:     85 tools  →  ~52,000 tokens
+GitHub Server:     14 tools  →  ~28,000 tokens
 Slack Server:      11 tools  →  ~24,000 tokens
 Internal Tools:    6 tools  →  ~12,000 tokens
 ─────────────────────────────────────────────
-Total:             102 tools  →  ~88,000 tokens (before any work happens)
+Total:             31 tools  →  ~64,000 tokens (before any work happens)
 ```
 
 ### 2. Inference Overhead
@@ -51,7 +51,7 @@ But you know what has a 0% failure rate?
 users.filter((u) => u.role === "admin");
 ```
 
-### 4. Models Were Never Trained for Tool Calling
+### 4. Models were never trained for tool calling
 
 The special tokens used for tool calls (`<tool_call>`, `</tool_call>`) are synthetic training data. Models dont have much exposure to the tool calling syntax, and have only seen contrived examples from training sets... but they DO have:
 
@@ -61,7 +61,9 @@ The special tokens used for tool calls (`<tool_call>`, `</tool_call>`) are synth
 > “Making an LLM perform tasks with tool calling is like putting Shakespeare through a month-long class in Mandarin and then asking him to write a play in it. It’s just not going to be his best work.”  
 > — [Cloudflare Engineering](https://blog.cloudflare.com/code-mode/)
 
-For example, Grok 4 & Gemini 3 were heavily trained on tool calling. Result? They hallucinate tool call XML syntax in the middle of responses, writing the format but not triggering actual execution. The model “knows” the syntax exists but doesn’t use it correctly.
+#### An example of a model that WAS trained to call tools
+
+Even though Grok 4 was heavily trained on tool calling. Result? It hallucinates tool call XML syntax in the middle of responses, writing the format but not triggering actual execution. The model “knows” the syntax exists but doesn’t use it correctly.
 
 ### 5. Privacy
 
