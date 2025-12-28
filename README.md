@@ -6,8 +6,7 @@ Codecall changes how agents interact with tools by letting them **write and exec
 
 Works with **MCP servers** and **standard tool definitions**.
 
-> [!NOTE]
-> **Before reading** :)
+> [!NOTE] > **Before reading** :)
 >
 > Please keep in mind all of this is the **future plan** for Codecall and how it will work. Codecall is still a WIP and not production ready.
 >
@@ -807,7 +806,9 @@ This keeps the UX of a "step by step" agent with user facing intermediate update
 - **42.3%** on Python
 - **47.7%** on TypeScript
 
-That's a 12% improvement just from language choice. TypeScript also gives you:
+That's a 12% improvement just from language choice, and various other models show the same pattern.
+
+TypeScript also gives you:
 
 - Full type inference for SDK generation
 - Compile time validation of tool schemas
