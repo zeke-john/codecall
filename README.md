@@ -53,7 +53,7 @@ The problem also compounds because each tool call adds its output to the context
 
 Benchmarks show models have a **10-50% failure rate** when searching through large datasets in context. They hallucinate field names, miss entries, and get confused by similar data.
 
-But you know what has a 0% failure rate?
+But doing this programmatically fixes this because it can just write code, as its deterministic (so 0% failure rate)
 
 ```typescript
 users.filter((u) => u.role === "admin");
