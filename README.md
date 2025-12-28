@@ -6,8 +6,7 @@ Codecall changes how agents interact with tools by letting them **write and exec
 
 Works with **MCP servers** and **standard tool definitions**.
 
-> [!NOTE]
-> **Before reading** :)
+> [!NOTE] > **Before reading** :)
 >
 > Please keep in mind all of this is the **future plan** for Codecall and how it will work. Codecall is still a WIP and not production ready.
 >
@@ -321,103 +320,6 @@ When the model finishes writing the TypeScript code, Codecall executes that code
 By default, the sandboxed code has no access to the filesystem, network, environment variables, or system processes. The only way it can interact with the outside world is by calling the tool functions exposed through tools (which are forwarded by Codecall to the MCP server).
 
 Every execution is independent. Retries in the recovery loop run in a new sandbox if it errors, which keeps execution fast, predictable, and easy to reason about while preventing state from leaking between runs.
-
-#### Sandbox Isolation Architecture
-
-An example with Internal Tools + an External MCP Server (Todoist)
-
-```
-┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                         SANDBOX ISOLATION ARCHITECTURE                                              │
-│                                                                                                                     │
-│  ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │                                           CODECALL RUNTIME (Node.js)                                          │  │
-│  │                                                                                                               │  │
-│  │   ┌──────────────────┐          ┌───────────────────────────────────────────────────────────────────────────┐ │  │
-│  │   │                  │          │                                                                           │ │  │
-│  │   │  LLM-Generated   │          │                    DENO SANDBOX (Isolated Process)                        │ │  │
-│  │   │  TypeScript Code │   spawn  │  ╔═══════════════════════════════════════════════════════════════════╗    │ │  │
-│  │   │                  │ ────────▶│  ║                                                                   ║    │ │  │
-│  │   │  ─────────────   │          │  ║   DENY-ALL PERMISSIONS                                            ║    │ │  │
-│  │   │  const tasks =   │          │  ║   ─────────────────────────────────────────────────────────────   ║    │ │  │
-│  │   │   await tools.   │          │  ║   ✗ --deny-read     (no filesystem access)                        ║    │ │  │
-│  │   │   todoist.       │          │  ║   ✗ --deny-write    (no file writes)                              ║    │ │  │
-│  │   │   getTasks();    │          │  ║   ✗ --deny-net      (no network access)                           ║    │ │  │
-│  │   │  ...             │          │  ║   ✗ --deny-env      (no environment variables)                    ║    │ │  │
-│  │   │                  │          │  ║   ✗ --deny-run      (no subprocess spawning)                      ║    │ │  │
-│  │   └──────────────────┘          │  ║   ✗ --deny-ffi      (no foreign function interface)               ║    │ │  │
-│  │                                 │  ║                                                                   ║    │ │  │
-│  │                                 │  ╚═══════════════════════════════════════════════════════════════════╝    │ │  │
-│  │                                 │                                                                           │ │  │
-│  │                                 │     ┌───────────────────────────────────────────────────────────────┐     │ │  │
-│  │                                 │     │                   INJECTED GLOBALS                            │     │ │  │
-│  │                                 │     │                                                               │     │ │  │
-│  │                                 │     │   tools.todoist.*  ───┐                                       │     │ │  │
-│  │                                 │     │   tools.internal.* ───┼─── Only way to interact               │     │ │  │
-│  │                                 │     │   progress()       ───┘    with outside world                 │     │ │  │
-│  │                                 │     │                                                               │     │ │  │
-│  │                                 │     └───────────────────────────────────────────────────────────────┘     │ │  │
-│  │                                 │                          │                                                │ │  │
-│  │                                 └──────────────────────────┼────────────────────────────────────────────────┘ │  │
-│  │                                                            │                                                  │  │
-│  │                                      ┌─────────────────────┴─────────────────────┐                            │  │
-│  │                                      │                                           │                            │  │
-│  │                                      ▼                                           ▼                            │  │
-│  │   ┌─────────────────────────────────────────────────┐   ┌─────────────────────────────────────────────────┐   │  │
-│  │   │                 TOOL BRIDGE                     │   │                 PROGRESS BRIDGE                 │   │  │
-│  │   │─────────────────────────────────────────────────│   │─────────────────────────────────────────────────│   │  │
-│  │   │                                                 │   │                                                 │   │  │
-│  │   │   Intercepts tools.* calls from sandbox         │   │   Streams progress({ ... }) updates             │   │  │
-│  │   │   Routes to appropriate handler:                │   │   to the UI in real-time                        │   │  │
-│  │   │                                                 │   │                                                 │   │  │
-│  │   │   ┌─────────────────┐  ┌─────────────────┐      │   │   progress({ step: "Loading tasks" })           │   │  │
-│  │   │   │ tools.todoist   │  │ tools.internal  │      │   │            │                                    │   │  │
-│  │   │   │ ├─ getTasks     │  │ ├─ searchDB     │      │   │            ▼                                    │   │  │
-│  │   │   │ ├─ addTask      │  │ ├─ sendEmail    │      │   │   ┌─────────────────────┐                       │   │  │
-│  │   │   │ └─ updateTask   │  │ └─ logAudit     │      │   │   │    Client / UI      │                       │   │  │
-│  │   │   └────────┬────────┘  └────────┬────────┘      │   │   └─────────────────────┘                       │   │  │
-│  │   │            │                    │               │   │                                                 │   │  │
-│  │   └────────────┼────────────────────┼───────────────┘   └─────────────────────────────────────────────────┘   │  │
-│  │                │                    │                                                                         │  │
-│  └────────────────┼────────────────────┼─────────────────────────────────────────────────────────────────────────┘  │
-│                   │                    │                                                                            │
-│ ══════════════════╪════════════════════╪════════════════════════════════════════════════════════════════════════════│
-│  EXTERNAL         │                    │  LOCAL                                                                     │
-│                   │                    │                                                                            │
-│                   ▼                    ▼                                                                            │
-│  ┌────────────────────────────────┐   ┌────────────────────────────────────────────────────────────────────────┐    │
-│  │        TODOIST MCP SERVER      │   │                      INTERNAL TOOL HANDLERS                            │    │
-│  │────────────────────────────────│   │────────────────────────────────────────────────────────────────────────│    │
-│  │                                │   │                                                                        │    │
-│  │  Protocol: MCP (tools/call)    │   │  Direct function calls with tool definitions:                          │    │
-│  │                                │   │                                                                        │    │
-│  │  Available Tools:              │   │  ┌─────────────────────────────────────────────────────────────────┐   │    │
-│  │  ├─ todoist.getTasks           │   │  │  searchDB: {                                                    │   │    │
-│  │  ├─ todoist.addTask            │   │  │    input: { query: string, table: string }                      │   │    │
-│  │  ├─ todoist.updateTask         │   │  │    output: Record<string, unknown>[]                            │   │    │
-│  │  ├─ todoist.deleteTask         │   │  │    handler: (input) => db.query(input.query)                    │   │    │
-│  │  ├─ todoist.getProjects        │   │  │  }                                                              │   │    │
-│  │  └─ todoist.completeTask       │   │  └─────────────────────────────────────────────────────────────────┘   │    │
-│  │                                │   │  ┌─────────────────────────────────────────────────────────────────┐   │    │
-│  └────────────────────────────────┘   │  │  sendEmail: {                                                   │   │    │
-│                                       │  │    input: { to: string, subject: string, body: string }         │   │    │
-│                                       │  │    output: { success: boolean, messageId: string }              │   │    │
-│                                       │  │    handler: (input) => emailService.send(input)                 │   │    │
-│                                       │  │  }                                                              │   │    │
-│                                       │  └─────────────────────────────────────────────────────────────────┘   │    │
-│                                       │  ┌─────────────────────────────────────────────────────────────────┐   │    │
-│                                       │  │  logAudit: {                                                    │   │    │
-│                                       │  │    input: { action: string, details: object }                   │   │    │
-│                                       │  │    output: { logged: boolean }                                  │   │    │
-│                                       │  │    handler: (input) => auditLog.write(input)                    │   │    │
-│                                       │  │  }                                                              │   │    │
-│                                       │  └─────────────────────────────────────────────────────────────────┘   │    │
-│                                       │                                                                        │    │
-│                                       └────────────────────────────────────────────────────────────────────────┘    │
-│                                                                                                                     │
-│                                                                                                                     │
-└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-```
 
 #### Sandbox Lifecycle Diagram
 
