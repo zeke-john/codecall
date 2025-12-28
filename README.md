@@ -6,6 +6,15 @@ Codecall changes how agents interact with tools by letting them **write and exec
 
 Works with **MCP servers** and **standard tool definitions**.
 
+> [!NOTE]
+> **Before reading** :)
+>
+> Please keep in mind all of this is the **future plan** for Codecall and how it will work. Codecall is still a WIP and not production ready.
+>
+> The README describes the vision and architecture for how the system will function once completed and worked on. Features, API design, and implementation details are subject to change.
+>
+> If you're interested in contributing or following the project, check back soon or open an issue to discuss ideas!
+
 ## The Problem
 
 Traditional tool calling has fundamental architectural issues that get worse at scale:
@@ -15,11 +24,10 @@ Traditional tool calling has fundamental architectural issues that get worse at 
 Every tool definition lives in your system prompt. Connect a few MCP servers and you're burning tens of thousands of tokens before the conversation even starts.
 
 ```
-GitHub Server:     14 tools  →  ~28,000 tokens
-Slack Server:      11 tools  →  ~24,000 tokens
-Internal Tools:    6 tools  →  ~12,000 tokens
-─────────────────────────────────────────────
-Total:             31 tools  →  ~64,000 tokens (before any work happens)
+GitHub MCP:        16 tools  →  ~32,000 tokens
+Internal Tools:    12 tools  →  ~24,000 tokens
+───────────────────────────────────────────────
+Total:             28 tools  →  ~56,000 tokens (before any work happens)
 ```
 
 ### 2. Inference Overhead
@@ -76,13 +84,46 @@ Let models do what they're good at: **writing code**.
 LLMs have enormous amounts of real-world TypeScript in their training data. They're significantly better at writing code to call APIs than they are at the arbitrary JSON matching that tool calling requires.
 
 ```typescript
-// Instead of 12 inference passes and 150k tokens:
-const users = await db.getUsers();
-const admins = users.filter((u) => u.role === "admin");
-await Promise.all(
-  admins.map((u) => db.updateUser(u.id, { permissions: newPerms }))
-);
-return { updated: admins.length };
+// Instead of 12+ inference passes and 150+ tokens:
+const allUsers = await tools.users.listAllUsers();
+const adminUsers = allUsers.filter((u) => u.role === "admin");
+const resources = await tools.resources.getSensitiveResources();
+
+progress({
+  step: "Data loaded",
+  admins: adminUsers.length,
+  resources: resources.length,
+});
+
+const revokedAccesses = [];
+const failedAccesses = [];
+
+for (const admin of adminUsers) {
+  for (const resource of resources) {
+    try {
+      const result = await tools.permissions.revokeAccess({
+        userId: admin.id,
+        resourceId: resource.id,
+      });
+      if (result.success) {
+        revokedAccesses.push({ admin: admin.name, resource: resource.name });
+      }
+    } catch (err) {
+      failedAccesses.push({
+        admin: admin.name,
+        resource: resource.name,
+        error: err.message,
+      });
+    }
+  }
+}
+
+return {
+  totalAdmins: adminUsers.length,
+  resourcesAffected: resources.length,
+  accessesRevoked: revokedAccesses.length,
+  accessesFailed: failedAccesses.length,
+};
 ```
 
 One inference pass. ~2,000 tokens. 98.7% reduction.
@@ -106,54 +147,58 @@ Codecall uses two model requests per user turn: one to write code, and one to ex
 At the start of every request, the model is shown only the file tree, not the contents of each file.
 
 ```
-/tools
-  /github
-    createPullRequest.ts
-    listIssues.ts
-    getRepository.ts
-    ...
-  /slack
-    sendMessage.ts
-    listChannels.ts
-    ...
-  /db
-    getUsers.ts
-    updateUser.ts
-    ...
+tools/
+├─ users/
+│ ├─ listAllUsers.ts
+│ ├─ getUser.ts
+│ ├─ updateUser.ts
+│ └─ ...
+├─ permissions/
+│ ├─ revokeAccess.ts
+│ ├─ grantAccess.ts
+│ ├─ listPermissions.ts
+│ └─ ...
+└─ resources/
+├─ getSensitiveResources.ts
+├─ listResources.ts
+└─ ...
 ```
 
 This gives the model a high-level map of what capabilities exist without bloating the prompt with thousands of lines of schemas.
 
-### Reading SDK Files (Discovery Phase)
+### Reading SDK Files (Discovering Tools)
 
 When the model needs to understand how a specific tool works, it can explicitly request the contents of a file using a built in `readFile` tool:
 
 ```typescript
 readFile({
-  module: "db",
-  name: "getUsers",
+  module: "users",
+  name: "listAllUsers",
 });
 ```
 
 This returns the entire contents of that SDK file, and each file contains type definitions for that tool, for example:
 
 ```typescript
-// /tools/db/getUsers.ts
-// SDK stub for tool: "db.getUsers"
+// /tools/users/listAllUsers.ts
+// SDK stub for tool: "users.listAllUsers"
 
-export interface GetUsersInput {
+export interface ListAllUsersInput {
   limit?: number;
+  offset?: number;
 }
 
 export interface User {
   id: string;
   name: string;
-  role: "admin" | "user" | "guest";
   email: string;
+  role: "admin" | "user" | "guest";
+  department: string;
+  createdAt: string;
 }
 
-export async function getUsers(input: GetUsersInput): Promise<User[]> {
-  return call("db.getUsers", input);
+export async function listAllUsers(input: ListAllUsersInput): Promise<User[]> {
+  return call("users.listAllUsers", input);
 }
 ```
 
@@ -161,17 +206,85 @@ The model can read only the files it needs which it can infer from the filenames
 
 This keeps prompts small while still giving the model precise, typed knowledge of each tool before it writes code.
 
-### Writing Code (Invocation Phase)
+### Writing Code
 
 After reading the relevant SDK files, the model writes a single TypeScript program like:
 
 ```typescript
-const patients = await tools.patients.getPatients();
-await tools.communications.sendSecureMessage(patientId, "...");
-return { ok: true };
+const allUsers = await tools.users.listAllUsers({ limit: 1000 });
+progress({ step: "Loaded all users", count: allUsers.length });
+
+const adminUsers = allUsers.filter((u) => u.role === "admin");
+progress({ step: "Identified admin users", count: adminUsers.length });
+
+const sensitiveResources = await tools.resources.getSensitiveResources();
+progress({
+  step: "Loaded sensitive resources",
+  count: sensitiveResources.length,
+});
+
+const revokedAccesses = [];
+const failedAccesses = [];
+let processed = 0;
+
+for (const admin of adminUsers) {
+  for (const resource of sensitiveResources) {
+    processed++;
+    try {
+      const result = await tools.permissions.revokeAccess({
+        userId: admin.id,
+        resourceId: resource.id,
+        reason: "security-audit",
+      });
+
+      if (result.success) {
+        revokedAccesses.push({
+          adminName: admin.name,
+          adminEmail: admin.email,
+          resourceName: resource.name,
+          revokedAt: result.timestamp,
+        });
+      } else {
+        failedAccesses.push({
+          adminName: admin.name,
+          resourceName: resource.name,
+          reason: result.reason || "unknown",
+        });
+      }
+
+      if (processed % 10 === 0) {
+        progress({
+          step: "Revoking access",
+          processed,
+          total: adminUsers.length * sensitiveResources.length,
+        });
+      }
+    } catch (err) {
+      failedAccesses.push({
+        adminName: admin.name,
+        resourceName: resource.name,
+        error: err.message,
+      });
+    }
+  }
+}
+
+return {
+  summary: {
+    totalAdminsAffected: adminUsers.length,
+    totalResourcesAffected: sensitiveResources.length,
+    totalAccessProcessed: processed,
+    accessesRevoked: revokedAccesses.length,
+    accessesFailed: failedAccesses.length,
+    successRate: Math.round((revokedAccesses.length / processed) * 100),
+  },
+  revoked: revokedAccesses,
+  failed: failedAccesses.slice(0, 20),
+};
 ```
 
-SDK files exist only for the model (types + discoverability).
+SDK files exist only for the model to get the types and discoverability.
+
 Runtime execution never imports SDK files, it uses a tools bridge injected by Codecall.
 
 ### How Tool Calls Work at Runtime
@@ -184,7 +297,11 @@ When the generated code runs, Codecall injects a real `tools` object into the sa
 So when the sandbox executes:
 
 ```typescript
-await tools.communications.sendSecureMessage(patientId, message);
+const result = await tools.permissions.revokeAccess({
+  userId: admin.id,
+  resourceId: resource.id,
+  reason: "security-audit",
+});
 ```
 
 What actually happens is:
@@ -205,7 +322,177 @@ By default, the sandboxed code has no access to the filesystem, network, environ
 
 Every execution is independent. Retries in the recovery loop run in a new sandbox if it errors, which keeps execution fast, predictable, and easy to reason about while preventing state from leaking between runs.
 
-### Returning Results to the Model (Response Phase)
+#### Sandbox Isolation Architecture
+
+An example with Internal Tools + an External MCP Server (Todoist)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                         SANDBOX ISOLATION ARCHITECTURE                                              │
+│                                                                                                                     │
+│  ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                                           CODECALL RUNTIME (Node.js)                                          │  │
+│  │                                                                                                               │  │
+│  │   ┌──────────────────┐          ┌───────────────────────────────────────────────────────────────────────────┐ │  │
+│  │   │                  │          │                                                                           │ │  │
+│  │   │  LLM-Generated   │          │                    DENO SANDBOX (Isolated Process)                        │ │  │
+│  │   │  TypeScript Code │   spawn  │  ╔═══════════════════════════════════════════════════════════════════╗    │ │  │
+│  │   │                  │ ────────▶│  ║                                                                   ║    │ │  │
+│  │   │  ─────────────   │          │  ║   DENY-ALL PERMISSIONS                                            ║    │ │  │
+│  │   │  const tasks =   │          │  ║   ─────────────────────────────────────────────────────────────   ║    │ │  │
+│  │   │   await tools.   │          │  ║   ✗ --deny-read     (no filesystem access)                        ║    │ │  │
+│  │   │   todoist.       │          │  ║   ✗ --deny-write    (no file writes)                              ║    │ │  │
+│  │   │   getTasks();    │          │  ║   ✗ --deny-net      (no network access)                           ║    │ │  │
+│  │   │  ...             │          │  ║   ✗ --deny-env      (no environment variables)                    ║    │ │  │
+│  │   │                  │          │  ║   ✗ --deny-run      (no subprocess spawning)                      ║    │ │  │
+│  │   └──────────────────┘          │  ║   ✗ --deny-ffi      (no foreign function interface)               ║    │ │  │
+│  │                                 │  ║                                                                   ║    │ │  │
+│  │                                 │  ╚═══════════════════════════════════════════════════════════════════╝    │ │  │
+│  │                                 │                                                                           │ │  │
+│  │                                 │     ┌───────────────────────────────────────────────────────────────┐     │ │  │
+│  │                                 │     │                   INJECTED GLOBALS                            │     │ │  │
+│  │                                 │     │                                                               │     │ │  │
+│  │                                 │     │   tools.todoist.*  ───┐                                       │     │ │  │
+│  │                                 │     │   tools.internal.* ───┼─── Only way to interact               │     │ │  │
+│  │                                 │     │   progress()       ───┘    with outside world                 │     │ │  │
+│  │                                 │     │                                                               │     │ │  │
+│  │                                 │     └───────────────────────────────────────────────────────────────┘     │ │  │
+│  │                                 │                          │                                                │ │  │
+│  │                                 └──────────────────────────┼────────────────────────────────────────────────┘ │  │
+│  │                                                            │                                                  │  │
+│  │                                      ┌─────────────────────┴─────────────────────┐                            │  │
+│  │                                      │                                           │                            │  │
+│  │                                      ▼                                           ▼                            │  │
+│  │   ┌─────────────────────────────────────────────────┐   ┌─────────────────────────────────────────────────┐   │  │
+│  │   │                 TOOL BRIDGE                     │   │                 PROGRESS BRIDGE                 │   │  │
+│  │   │─────────────────────────────────────────────────│   │─────────────────────────────────────────────────│   │  │
+│  │   │                                                 │   │                                                 │   │  │
+│  │   │   Intercepts tools.* calls from sandbox         │   │   Streams progress({ ... }) updates             │   │  │
+│  │   │   Routes to appropriate handler:                │   │   to the UI in real-time                        │   │  │
+│  │   │                                                 │   │                                                 │   │  │
+│  │   │   ┌─────────────────┐  ┌─────────────────┐      │   │   progress({ step: "Loading tasks" })           │   │  │
+│  │   │   │ tools.todoist   │  │ tools.internal  │      │   │            │                                    │   │  │
+│  │   │   │ ├─ getTasks     │  │ ├─ searchDB     │      │   │            ▼                                    │   │  │
+│  │   │   │ ├─ addTask      │  │ ├─ sendEmail    │      │   │   ┌─────────────────────┐                       │   │  │
+│  │   │   │ └─ updateTask   │  │ └─ logAudit     │      │   │   │    Client / UI      │                       │   │  │
+│  │   │   └────────┬────────┘  └────────┬────────┘      │   │   └─────────────────────┘                       │   │  │
+│  │   │            │                    │               │   │                                                 │   │  │
+│  │   └────────────┼────────────────────┼───────────────┘   └─────────────────────────────────────────────────┘   │  │
+│  │                │                    │                                                                         │  │
+│  └────────────────┼────────────────────┼─────────────────────────────────────────────────────────────────────────┘  │
+│                   │                    │                                                                            │
+│ ══════════════════╪════════════════════╪════════════════════════════════════════════════════════════════════════════│
+│  EXTERNAL         │                    │  LOCAL                                                                     │
+│                   │                    │                                                                            │
+│                   ▼                    ▼                                                                            │
+│  ┌────────────────────────────────┐   ┌────────────────────────────────────────────────────────────────────────┐    │
+│  │        TODOIST MCP SERVER      │   │                      INTERNAL TOOL HANDLERS                            │    │
+│  │────────────────────────────────│   │────────────────────────────────────────────────────────────────────────│    │
+│  │                                │   │                                                                        │    │
+│  │  Protocol: MCP (tools/call)    │   │  Direct function calls with tool definitions:                          │    │
+│  │                                │   │                                                                        │    │
+│  │  Available Tools:              │   │  ┌─────────────────────────────────────────────────────────────────┐   │    │
+│  │  ├─ todoist.getTasks           │   │  │  searchDB: {                                                    │   │    │
+│  │  ├─ todoist.addTask            │   │  │    input: { query: string, table: string }                      │   │    │
+│  │  ├─ todoist.updateTask         │   │  │    output: Record<string, unknown>[]                            │   │    │
+│  │  ├─ todoist.deleteTask         │   │  │    handler: (input) => db.query(input.query)                    │   │    │
+│  │  ├─ todoist.getProjects        │   │  │  }                                                              │   │    │
+│  │  └─ todoist.completeTask       │   │  └─────────────────────────────────────────────────────────────────┘   │    │
+│  │                                │   │  ┌─────────────────────────────────────────────────────────────────┐   │    │
+│  └────────────────────────────────┘   │  │  sendEmail: {                                                   │   │    │
+│                                       │  │    input: { to: string, subject: string, body: string }         │   │    │
+│                                       │  │    output: { success: boolean, messageId: string }              │   │    │
+│                                       │  │    handler: (input) => emailService.send(input)                 │   │    │
+│                                       │  │  }                                                              │   │    │
+│                                       │  └─────────────────────────────────────────────────────────────────┘   │    │
+│                                       │  ┌─────────────────────────────────────────────────────────────────┐   │    │
+│                                       │  │  logAudit: {                                                    │   │    │
+│                                       │  │    input: { action: string, details: object }                   │   │    │
+│                                       │  │    output: { logged: boolean }                                  │   │    │
+│                                       │  │    handler: (input) => auditLog.write(input)                    │   │    │
+│                                       │  │  }                                                              │   │    │
+│                                       │  └─────────────────────────────────────────────────────────────────┘   │    │
+│                                       │                                                                        │    │
+│                                       └────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                                                     │
+│                                                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Sandbox Lifecycle Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                              SANDBOX LIFECYCLE                                          │
+│                                                                                         │
+│   ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐           │
+│   │  SPAWN  │────▶│  INJECT │────▶│ EXECUTE │────▶│ CAPTURE │────▶│ DESTROY │           │
+│   └─────────┘     └─────────┘     └─────────┘     └─────────┘     └─────────┘           │
+│        │               │               │               │               │                │
+│        ▼               ▼               ▼               ▼               ▼                │
+│   Fresh Deno      tools proxy     Run generated    Collect return   Terminate           │
+│   process with    + progress()    TypeScript       value or error   process,            │
+│   deny-all        injected        code             + exec trace     cleanup             │
+│   permissions                                                                           │
+│                                                                                         │
+│                                                                                         │
+│   ON ERROR:                                                                             │
+│   ┌─────────────────────────────────────────────────────────────────────────┐           │
+│   │                                                                         │           │
+│   │   Error + Trace + Original Code + User Request                          │           │
+│   │                        │                                                │           │
+│   │                        ▼                                                │           │
+│   │              ┌─────────────────┐                                        │           │
+│   │              │   Model (LLM)   │  Rewrites code to fix issue            │           │
+│   │              └────────┬────────┘                                        │           │
+│   │                       │                                                 │           │
+│   │                       ▼                                                 │           │
+│   │              NEW SANDBOX SPAWNED ───────────────────▶ Retry (max 3)     │           │
+│   │                                                                         │           │
+│   └─────────────────────────────────────────────────────────────────────────┘           │
+│                                                                                         │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Data Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                                  DATA FLOW                                              │
+│                                                                                         │
+│                                                                                         │
+│    SANDBOX                        TOOL BRIDGE                         MCP SERVER        │
+│       │                               │                                    │            │
+│       │  tools.users.listAllUsers()   │                                    │            │
+│       │ ─────────────────────────────▶│                                    │            │
+│       │                               │                                    │            │
+│       │                               │   tools/call: listAllUsers         │            │
+│       │                               │ ──────────────────────────────────▶│            │
+│       │                               │                                    │            │
+│       │                               │          [{ id, name, role }, ...] │            │
+│       │                               │ ◀──────────────────────────────────│            │
+│       │                               │                                    │            │
+│       │   Promise<User[]> resolved    │                                    │            │
+│       │ ◀─────────────────────────────│                                    │            │
+│       │                               │                                    │            │
+│       │  (code continues execution)   │                                    │            │
+│       │                               │                                    │            │
+│       │  progress({ step: "Done" })   │                                    │            │
+│       │ ─────────────────────────────▶│                                    │            │
+│       │                               │                                    │            │
+│       │                          Streams to UI                             │            │
+│       │                               │                                    │            │
+│       │  return { success: true }     │                                    │            │
+│       │ ─────────────────────────────▶│                                    │            │
+│       │                               │                                    │            │
+│       │                     Result sent to Model                           │            │
+│       │                     for response generation                        │            │
+│       │                               │                                    │            │
+│                                       ▼                                                 │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Returning Results to the Model
 
 After the sandbox finishes executing the generated code, Codecall returns the final result object, with the same conversation history as the original user request back to the same model so it can produce a user-facing response.
 
@@ -229,18 +516,30 @@ This happens in a second model request, so the flow looks like this:
 For example, after execution completes:
 
 ```typescript
-
 {
-  totalDiabetic: 127,
-  remindersSent: 23,
-  patients: ["Mike Chen", "Lisa Park", "..."]
+  summary: {
+    totalAdminsAffected: 12,
+    totalResourcesAffected: 5,
+    totalAccessProcessed: 60,
+    accessesRevoked: 58,
+    accessesFailed: 2,
+    successRate: 97,
+  },
+  revoked: [
+    { adminName: "Alice Chen", adminEmail: "alice@company.com", resourceName: "Production Database", revokedAt: "2025-12-27T18:05:32Z" },
+    { adminName: "Bob Smith", adminEmail: "bob@company.com", resourceName: "Production Database", revokedAt: "2025-12-27T18:05:33Z" },
+    // ... 56 more entries (you can modify how much data you want the llm to return with in your prompt)
+  ],
+  failed: [
+    { adminName: "Charlie Davis", resourceName: "API Gateway", reason: "dependency-lock" },
+    { adminName: "Diana Wong", resourceName: "Billing System", error: "timeout after 30s" },
+  ],
 }
-
 ```
 
 The model receives that result and responds:
 
-> “I found 127 diabetic patients. 23 of them haven’t had an A1C test in the last 6 months, so I sent appointment reminders to each of them.”
+> “I successfully revoked admin access across the organization. Out of 60 total access permissions (12 admins across 5 sensitive resources), I revoked 58 successfully with a 97% success rate. 2 revocations failed due to system locks and timeouts that will need manual intervention. The revoked admins include Alice Chen, Bob Smith, and 10 others. Most failures occurred on the API Gateway and Billing System where there are active dependencies preventing immediate access removal.”
 
 ## Handling Errors (v2)
 
@@ -258,9 +557,22 @@ Real world API data is messy so pre-written code can (and will) fail. Codecall h
 **1. Agent writes optimistic code:**
 
 ```typescript
-// Agent assumes getWeather accepts a city string
-const location = await tools.getLocation(); // Returns "London"
-const weather = await tools.getWeather(location);
+const allUsers = await tools.users.listAllUsers();
+progress({ step: "Loaded users", count: allUsers.length });
+
+const adminUsers = allUsers.filter((u) => u.role === "admin");
+const resources = await tools.resources.getSensitiveResources();
+progress({ step: "Loaded resources", count: resources.length });
+
+const revoked = [];
+for (const admin of adminUsers) {
+  for (const resource of resources) {
+    await tools.permissions.revokeAccess(admin.id, resource.id);
+    revoked.push({ admin: admin.name, resource: resource.name });
+  }
+}
+
+return { totalRevoked: revoked.length };
 ```
 
 **2. Execution fails. Codecall catches and returns:**
@@ -268,34 +580,106 @@ const weather = await tools.getWeather(location);
 ```typescript
 {
   "status": "failed",
-  "error": "ToolError: getWeather expected object { lat: number, long: number }, got string",
-  "trace": [
+  "error": "ToolError: revokeAccess expected object { userId: string, resourceId: string }, got (string, string)",
+  "executionTrace": [
     {
-      "function": "getLocation",
+      "step": 1,
+      "function": "listAllUsers",
       "input": {},
-      "output": "London"
+      "output": { "count": 47, "users": [{ "id": "admin-1", "name": "Alice", "role": "admin" }, ...] }
     },
     {
-      "function": "getWeather",
-      "input": "London",
-      "error": "Invalid Argument Schema"
+      "step": 2,
+      "progress": "Loaded users",
+      "data": { "count": 47 }
+    },
+    {
+      "step": 3,
+      "function": "getSensitiveResources",
+      "input": {},
+      "output": { "count": 5, "resources": [{ "id": "resource-db-prod", "name": "Production Database" }, ...] }
+    },
+    {
+      "step": 4,
+      "progress": "Loaded resources",
+      "data": { "count": 5 }
+    },
+    {
+      "step": 5,
+      "function": "revokeAccess",
+      "input": ["admin-1", "resource-db-prod"],
+      "error": "Invalid Argument Schema. Expected { userId, resourceId }, got positional arguments"
     }
   ],
-  "message": "Your code failed at step 2. The API schema didn't match your input. Use the trace above to fix your code and retry."
+  "failurePoint": "step 5",
+  "context": "The function revokeAccess was called with positional arguments instead of an object. The sandbox successfully loaded 47 users and 5 resources before failing on the first access revocation."
 }
 ```
 
 **3. Agent self-corrects and retries:**
 
 ```typescript
-// Agent sees the error and fixes the implementation
-const location = await tools.getLocation(); // "London"
-const coords = await tools.geocode(location); // Fetch coordinates first
-const weather = await tools.getWeather({
-  lat: coords.lat,
-  long: coords.long,
-});
-return weather;
+const allUsers = await tools.users.listAllUsers();
+progress({ step: "Loaded users", count: allUsers.length });
+
+const adminUsers = allUsers.filter((u) => u.role === "admin");
+const resources = await tools.resources.getSensitiveResources();
+progress({ step: "Loaded resources", count: resources.length });
+
+const revokedAccesses = [];
+const failedAccesses = [];
+let processed = 0;
+
+for (const admin of adminUsers) {
+  for (const resource of resources) {
+    processed++;
+    try {
+      const result = await tools.permissions.revokeAccess({
+        userId: admin.id,
+        resourceId: resource.id,
+      });
+
+      if (result.success) {
+        revokedAccesses.push({
+          adminName: admin.name,
+          resourceName: resource.name,
+        });
+      } else {
+        failedAccesses.push({
+          adminName: admin.name,
+          resourceName: resource.name,
+          reason: result.reason,
+        });
+      }
+
+      if (processed % 15 === 0) {
+        progress({
+          step: "Revoking access",
+          processed,
+          total: adminUsers.length * resources.length,
+        });
+      }
+    } catch (err) {
+      failedAccesses.push({
+        adminName: admin.name,
+        resourceName: resource.name,
+        error: err.message,
+      });
+    }
+  }
+}
+
+return {
+  summary: {
+    totalAdmins: adminUsers.length,
+    totalResources: resources.length,
+    processed,
+    revoked: revokedAccesses.length,
+    failed: failedAccesses.length,
+  },
+  revokedSample: revokedAccesses.slice(0, 10),
+  failedDetails: failedAccesses,
+};
 ```
 
 On failure, Codecall returns the error, full execution trace, the TypeScript code which failed, and the original user request with the main task to the model. The sandbox is destroyed after each run, but the trace is preserved.
@@ -321,68 +705,96 @@ When writing code, use progress(...) to show meaningful updates. can see what is
 Agent Code Example
 
 ```typescript
-const SIX_MONTHS_AGO = new Date();
-SIX_MONTHS_AGO.setMonth(SIX_MONTHS_AGO.getMonth() - 6);
-
-progress({ step: "Loading patients..." });
-const patients = await tools.patients.getPatients();
-
-const diabeticPatients = patients.filter((p) =>
-  p.conditions.includes("diabetes")
-);
+const allUsers = await tools.users.listAllUsers({ limit: 5000 });
 progress({
-  step: "Filtered diabetic patients",
-  count: diabeticPatients.length,
+  step: "Loaded all users",
+  totalCount: allUsers.length,
+  adminCount: allUsers.filter((u) => u.role === "admin").length,
 });
 
-const needsReminder: typeof patients = [];
+const adminUsers = allUsers.filter((u) => u.role === "admin");
+const sensitiveResources = await tools.resources.getSensitiveResources();
+progress({
+  step: "Loaded sensitive resources",
+  resourceCount: sensitiveResources.length,
+  resourceNames: sensitiveResources.map((r) => r.name),
+});
 
-for (let i = 0; i < diabeticPatients.length; i++) {
-  const patient = diabeticPatients[i];
+const revokedAccesses = [];
+const failedAccesses = [];
 
-  progress({
-    step: "Checking lab results",
-    current: i + 1,
-    total: diabeticPatients.length,
-    patient: patient.name,
-  });
+for (let i = 0; i < adminUsers.length; i++) {
+  const admin = adminUsers[i];
 
-  const labs = await tools.records.getLabResults(patient.id);
-  const recentA1C = labs.find(
-    (lab) => lab.test === "A1C" && new Date(lab.date) > SIX_MONTHS_AGO
-  );
+  for (let j = 0; j < sensitiveResources.length; j++) {
+    const resource = sensitiveResources[j];
 
-  if (!recentA1C) {
-    needsReminder.push(patient);
+    try {
+      const result = await tools.permissions.revokeAccess({
+        userId: admin.id,
+        resourceId: resource.id,
+        reason: "security-audit",
+      });
+
+      if (result.success) {
+        revokedAccesses.push({
+          admin: admin.name,
+          email: admin.email,
+          resource: resource.name,
+          timestamp: result.timestamp,
+        });
+      } else {
+        failedAccesses.push({
+          admin: admin.name,
+          resource: resource.name,
+          reason: result.reason || "unknown",
+        });
+      }
+
+      if (((i + 1) * (j + 1)) % 10 === 0) {
+        progress({
+          step: "Revoking access",
+          admin: admin.name,
+          resource: resource.name,
+          processed: revokedAccesses.length + failedAccesses.length,
+          revoked: revokedAccesses.length,
+          failed: failedAccesses.length,
+        });
+      }
+    } catch (err) {
+      failedAccesses.push({
+        admin: admin.name,
+        resource: resource.name,
+        error: err.message,
+      });
+    }
   }
 }
 
 progress({
-  step: "Sending reminders",
-  total: needsReminder.length,
+  step: "Access revocation complete",
+  revoked: revokedAccesses.length,
+  failed: failedAccesses.length,
 });
 
-for (let i = 0; i < needsReminder.length; i++) {
-  const patient = needsReminder[i];
-
-  progress({
-    step: "Sending reminder",
-    current: i + 1,
-    total: needsReminder.length,
-    patient: patient.name,
-  });
-
-  await tools.communications.sendAppointmentReminder(
-    patient.id,
-    `Hi ${
-      patient.name.split(" ")[0]
-    }, you're due for your A1C test. Please schedule an appointment.`
-  );
-}
-
 return {
-  totalDiabetic: diabeticPatients.length,
-  remindersSent: needsReminder.length,
+  execution: {
+    totalAdminsProcessed: adminUsers.length,
+    totalResourcesAffected: sensitiveResources.length,
+    totalAttempted: revokedAccesses.length + failedAccesses.length,
+    accessesRevoked: revokedAccesses.length,
+    accessesFailed: failedAccesses.length,
+    successPercentage: Math.round(
+      (revokedAccesses.length /
+        (revokedAccesses.length + failedAccesses.length)) *
+        100
+    ),
+  },
+  revokedDetails: revokedAccesses.map((r) => ({
+    ...r,
+    status: "success",
+  })),
+  failureDetails: failedAccesses.slice(0, 25),
 };
 ```
 
@@ -423,11 +835,12 @@ This project builds on ideas from the community and is directly inspired by:
 
 - Yannic Kilcher – [What Cloudflare's code mode misses about MCP and tool calling](https://www.youtube.com/watch?v=0bpYCxv2qhw)
 - Theo – [Anthropic admits that MCP sucks](https://www.youtube.com/watch?v=1piFEKA9XL0&t=201s) & [Anthropic is trying SO hard to fix MCP...](https://www.youtube.com/watch?v=hPPTrsUzLA8&t=2s)
+- Boundary - [Using MCP server with 10000+ tools: 🦄 Ep #7](https://www.youtube.com/watch?v=P5wRLKF4bt8)
 
 #### Articles
 
 - Cloudflare – [Code mode: the better way to use MCP](https://blog.cloudflare.com/code-mode/)
-- Anthropic – [Code execution with MCP: building more efficient AI agents](https://www.anthropic.com/engineering/code-execution-with-mcp) & [Introducing advanced tool use on the Claude developer platform](https://www.anthropic.com/engineering/advanced-tool-use)
+- Anthropic – [Code execution with MCP: building more efficient AI agents](https://www.anthropic.com/engineering/code-execution-with-mcp) & [Introducing advanced tool use](https://www.anthropic.com/engineering/advanced-tool-use)
 - Medium - [Your Agent Is Wasting Money On Tools. Code Execution With MCP Fixes It.](https://medium.com/genaius/your-agent-is-wasting-money-on-tools-code-execution-with-mcp-fixes-it-5c8d7b177bad)
 
 ## License
