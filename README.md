@@ -802,7 +802,7 @@ This keeps the UX of a "step by step" agent with user facing intermediate update
 
 ## Why TypeScript?
 
-Anthropic's own benchmarks show Claude Opus 4.1 performs:
+[Benchmarks](https://github.com/Tencent-Hunyuan/AutoCodeBenchmark?tab=readme-ov-file#experimental-results) show Claude Opus 4.1 performs:
 
 - **42.3%** on Python
 - **47.7%** on TypeScript
