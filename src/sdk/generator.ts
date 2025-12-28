@@ -1,15 +1,21 @@
-/**
- * generator.ts
- * 
- * Converts raw MCP tool definitions into TypeScript SDK files.
- * Generates proper TS SDK stubs that the model can read and understand.
- * 
- * Responsibilities:
- * - Parse MCP tool definitions
- * - Generate TypeScript type definitions
- * - Create SDK function stubs
- * - Write SDK files to temporary directory
- * - Generate the file tree for the model to see
- */
+import { ToolSource, GeneratedSDK, VirtualFileSystem } from "../types";
+import { generateSDKFromLLM } from "../llm/modelClient";
 
-// TODO: Implement SDK generation
+export async function generateSDK(source: ToolSource): Promise<GeneratedSDK> {
+  return generateSDKFromLLM(source);
+}
+
+export async function generateVirtualSDK(
+  sources: ToolSource[]
+): Promise<VirtualFileSystem> {
+  const vfs = new VirtualFileSystem();
+  for (const source of sources) {
+    const sdk = await generateSDK(source);
+    for (const file of sdk.files) {
+      const path = `tools/${sdk.folderName}/${file.fileName}`;
+      vfs.set(path, file.content);
+    }
+  }
+
+  return vfs;
+}

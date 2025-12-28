@@ -1,12 +1,19 @@
-import express from "express";
+export { VirtualFileSystem } from "./types/sdk";
+export {
+  ToolDefinition,
+  ToolSource,
+  GeneratedSDK,
+  GeneratedSDKFile,
+  JSONSchema,
+  JSONSchemaProperty,
+} from "./types/tool";
 
-const app = express();
-const PORT = 3000;
-
-app.get("/", (_req, res) => {
-  res.send("backend running");
-});
-
-app.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
-});
+export {
+  connectToMCP,
+  createInternalToolSource,
+  MCPServerConfig,
+  StdioServerConfig,
+  HttpServerConfig,
+} from "./mcp/mcpClient";
+export { generateSDK, generateVirtualSDK } from "./sdk/generator";
+export { generateSDKFromLLM, callOpenRouter } from "./llm/modelClient";
