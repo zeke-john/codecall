@@ -187,6 +187,8 @@ Because Codecall focuses on deterministic, type-safe code generation, its benefi
 
 There is no reliable workaround when using external MCP servers: if you do not control the tool, you cannot enforce structured outputs.
 
+---
+
 ## How Codecall Works (WIP)
 
 Instead of exposing every tool directly to the LLM for it to call, Codecall:
