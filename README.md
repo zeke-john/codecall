@@ -73,10 +73,6 @@ The special tokens used for tool calls (`<tool_call>`, `</tool_call>`) are synth
 
 Even though Grok 4 was heavily trained on tool calling. Result? It hallucinates tool call XML syntax in the middle of responses, writing the format but not triggering actual execution. The model “knows” the syntax exists but doesn’t use it correctly.
 
-### 5. Privacy
-
-Every intermediate result flows through the model provider. That 10,000 row customer spreadsheet? That internal employee database? All of it goes into the model's context window and through the API provider's infrastructure.
-
 ## The Solution
 
 Let models do what they're good at: **writing code**.
@@ -717,6 +713,31 @@ TypeScript also gives you:
 - Full type inference for SDK generation
 - Compile time validation of tool schemas
 - The model sees types and can use them correctly
+
+## Main Challenges
+
+### Output Schemas from Tools
+
+MCP tool definitions include `inputSchema` (what you pass to a tool) but `outputSchema` is **optional** and most servers almost never provide it.
+
+**Why this matters:** Codecall generates TypeScript code that chains tool calls together. Without knowing what a tool returns, the model has to guess the structure, leading to runtime errors.
+
+**Example of the problem:**
+
+```typescript
+const tasks = await tools.todoist.getTasks({ filter: "today" });
+
+for (const task of tasks) {
+  console.log(task.title);  // BUG: actual property is "content", not "title"
+}
+
+if (task.dueDate === "2024-01-15") { ... }
+// BUG: actual structure is task.due.string, not task.dueDate
+```
+
+The code looks correct but fails at runtime because the model hallucinated the return type based on common naming patterns.
+
+**Possible solutions being explored**
 
 ## Roadmap
 
