@@ -737,8 +737,6 @@ if (task.dueDate === "2024-01-15") { ... }
 
 The code looks correct but fails at runtime because the model hallucinated the return type based on common naming patterns.
 
-**Possible solutions being explored**
-
 ## Roadmap
 
 WIP, Please check back soon or feel free to add here :)
