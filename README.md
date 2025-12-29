@@ -145,7 +145,7 @@ if (task.dueDate === "2024-01-15") { ... }
 // BUG: actual structure is task.due, not task.dueDate
 ```
 
-The code looks correct but fails at runtime because the model hallucinated the return type based on common naming patterns.
+The code looks correct but fails at runtime because the model hallucinated the return type based on common naming patterns...
 
 **Our Workaround:** We haven't fully solved this (that would require MCP servers to provide `outputSchema`), but we've implemented a hack that works in practice:
 
@@ -162,7 +162,7 @@ This means tools like `search_engine` now generate SDKs with accurate output typ
 - Single sample responses may miss optional fields or variant shapes
 - Write+Read tools create real data (we use identifiable test names like `codecall_test_*`)
 
-### Tool Outputs Are Often Plain Strings
+### Tool Outputs Are Often Plain Strings (Main Blocker)
 
 A second more fundamental challenge is that a lot of MCP servers return plain strings or markdown, not structured data...
 
