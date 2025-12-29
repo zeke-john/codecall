@@ -147,7 +147,8 @@ if (task.dueDate === "2024-01-15") { ... }
 
 The code looks correct but fails at runtime because the model hallucinated the return type based on common naming patterns...
 
-**Our Workaround:** We haven't fully solved this (that would require MCP servers to provide `outputSchema`), but we've implemented a hack that works in practice:
+**OUR WORKAROUND:**
+We haven't fully solved this (that would require MCP servers to provide `outputSchema`), but we've implemented a hack that works in practice:
 
 1. **Tool Classification** - We use an LLM to classify each tool as `read`, `write`, `destructive`, or `write_read` based on its semantics
 2. **Output Schema Discovery** - For tools classified as `read` or `write_read`, we generate safe sample inputs and actually call the tool
@@ -162,7 +163,9 @@ This means tools like `search_engine` now generate SDKs with accurate output typ
 - Single sample responses may miss optional fields or variant shapes
 - Write+Read tools create real data (we use identifiable test names like `codecall_test_*`)
 
-### Tool Outputs Are Often Plain Strings (Main Blocker)
+---
+
+### Tool Outputs Are Often Plain Strings (MAIN BLOCKER)
 
 A second more fundamental challenge is that a lot of MCP servers return plain strings or markdown, not structured data...
 
