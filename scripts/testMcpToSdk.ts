@@ -1,8 +1,9 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 
-import { connectToMCP, MCPServerConfig } from "../src/mcp/mcpClient";
-import { generateVirtualSDK } from "../src/sdk/generator";
+import * as path from "path";
+import { MCPServerConfig } from "../src/mcp/mcpClient";
+import { generateVirtualSDKFromMCP } from "../src/sdk/generator";
 
 async function main() {
   if (!process.env.OPENROUTER_API_KEY) {
@@ -14,25 +15,49 @@ async function main() {
   if (args.length === 0) {
     console.log("Usage:");
     console.log(
-      "  npm run test:mcp -- stdio <command> [args...] [--env KEY=VALUE ...]"
+      "  npm run test:mcp -- stdio <command> [args...] [--env KEY=VALUE ...] [--skip-discovery] [--output <dir>]"
     );
-    console.log("  npm run test:mcp -- http <url>");
+    console.log(
+      "  npm run test:mcp -- http <url> [--skip-discovery] [--output <dir>]"
+    );
+    console.log("\nOptions:");
+    console.log(
+      "  --skip-discovery  Skip output schema discovery (faster, but no output types)"
+    );
+    console.log(
+      "  --output <dir>    Write SDK files to disk (default: generatedSdks)"
+    );
     process.exit(1);
   }
 
   const mode = args[0];
   let config: MCPServerConfig;
+  let skipDiscovery = false;
+  let outputDir: string | undefined;
 
   if (mode === "http") {
     config = { type: "http", url: args[1] };
+    skipDiscovery = args.includes("--skip-discovery");
+    const outputIdx = args.indexOf("--output");
+    if (outputIdx !== -1 && args[outputIdx + 1]) {
+      outputDir = args[outputIdx + 1];
+    }
   } else if (mode === "stdio") {
     const restArgs = args.slice(1);
     const envArgs: Record<string, string> = {};
     const commandArgs: string[] = [];
     let collectingEnv = false;
+    let expectingOutput = false;
 
     for (const arg of restArgs) {
-      if (arg === "--env") {
+      if (arg === "--skip-discovery") {
+        skipDiscovery = true;
+      } else if (arg === "--output") {
+        expectingOutput = true;
+      } else if (expectingOutput) {
+        outputDir = arg;
+        expectingOutput = false;
+      } else if (arg === "--env") {
         collectingEnv = true;
       } else if (collectingEnv && arg.includes("=")) {
         const [key, ...val] = arg.split("=");
@@ -54,18 +79,42 @@ async function main() {
     process.exit(1);
   }
 
-  const source = await connectToMCP(config);
-  console.log("source:", JSON.stringify(source, null, 2));
-  const sdk = await generateVirtualSDK([source]);
+  console.log("Connecting to MCP server...");
+  console.log(`Skip discovery: ${skipDiscovery}`);
+  if (outputDir) {
+    console.log(`Output directory: ${outputDir}`);
+  }
 
-  console.log("\nsdk.getTree():");
-  console.log(sdk.getTree());
+  const { vfs, errors } = await generateVirtualSDKFromMCP(config, {
+    skipOutputDiscovery: skipDiscovery,
+  });
 
-  const firstFile = sdk.getAllPaths()[0];
-  console.log(`\nsdk.get("${firstFile}"):`);
-  console.log(sdk.get(firstFile));
+  if (errors.length > 0) {
+    console.log("\nDiscovery errors:");
+    for (const error of errors) {
+      console.log(`  - ${error.toolName}: ${error.error}`);
+    }
+  }
+
+  console.log("\nGenerated files:");
+  console.log(vfs.getTree());
+
+  if (outputDir) {
+    const fullOutputPath = path.resolve(outputDir);
+    await vfs.writeToDisk(fullOutputPath);
+    console.log(`\nFiles written to: ${fullOutputPath}`);
+  } else {
+    const allPaths = vfs.getAllPaths();
+    for (const filePath of allPaths) {
+      console.log(`\n--- ${filePath} ---`);
+      console.log(vfs.get(filePath));
+    }
+  }
 }
 
 main().catch(console.error);
 
-// npm run test:mcp -- stdio node todoist-mcp-server/dist/index.js --env TODOIST_API_TOKEN=xxx
+// npm run test:mcp -- stdio npx @doist/todoist-ai --env TODOIST_API_KEY=xxx --output generatedSdks
+// npm run test:mcp -- stdio npx @brightdata/mcp --env API_TOKEN=xxx --output generatedSdks
+//npm run test:mcp -- stdio npx @playwright/mcp@latest --output generatedSdks
+// --skip-discovery

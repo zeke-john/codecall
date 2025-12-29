@@ -30,6 +30,19 @@ export interface ToolDefinition {
   inputSchema: JSONSchema;
 }
 
+export type ToolCategory = "read" | "write" | "destructive" | "write_read";
+
+export interface ClassifiedTool extends ToolDefinition {
+  category: ToolCategory;
+  outputSchema?: JSONSchema;
+}
+
+export interface ClassifiedToolSource {
+  name: string;
+  version?: string;
+  tools: ClassifiedTool[];
+}
+
 export interface ToolSource {
   name: string;
   version?: string;

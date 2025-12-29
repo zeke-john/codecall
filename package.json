@@ -13,7 +13,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@brightdata/mcp": "^2.7.1",
+    "@doist/todoist-ai": "^6.2.0",
     "@modelcontextprotocol/sdk": "^1.25.1",
+    "@playwright/mcp": "^0.0.53",
     "dotenv": "^17.2.3",
     "express": "^5.2.1"
   },

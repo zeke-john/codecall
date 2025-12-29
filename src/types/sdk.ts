@@ -1,8 +1,20 @@
+import * as fs from "fs";
+import * as path from "path";
+
 export class VirtualFileSystem {
   private files = new Map<string, string>();
 
-  set(path: string, content: string): void {
-    this.files.set(path, content);
+  set(filePath: string, content: string): void {
+    this.files.set(filePath, content);
+  }
+
+  async writeToDisk(outputDir: string): Promise<void> {
+    for (const [filePath, content] of this.files) {
+      const fullPath = path.join(outputDir, filePath);
+      const dir = path.dirname(fullPath);
+      await fs.promises.mkdir(dir, { recursive: true });
+      await fs.promises.writeFile(fullPath, content, "utf-8");
+    }
   }
 
   get(path: string): string | undefined {

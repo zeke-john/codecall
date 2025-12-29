@@ -124,6 +124,66 @@ return {
 
 One inference pass. ~2,000 tokens. 98.7% reduction.
 
+## Main Challenges (Recently Updated)
+
+### Output Schemas from Tools
+
+MCP tool definitions include `inputSchema` (what you pass to a tool) but `outputSchema` is **optional** and most servers almost never provide it.
+
+**Why this matters:** Codecall generates TypeScript code that chains tool calls together. Without knowing what a tool returns, the model has to guess the structure, leading to runtime errors.
+
+**Example of the problem:**
+
+```typescript
+const tasks = await tools.todoist.getTasks({ filter: "today" });
+
+for (const task of tasks) {
+  console.log(task.title);  // BUG: actual property is "name", not "title"
+}
+
+if (task.dueDate === "2024-01-15") { ... }
+// BUG: actual structure is task.due, not task.dueDate
+```
+
+The code looks correct but fails at runtime because the model hallucinated the return type based on common naming patterns.
+
+**Our Workaround:** We haven't fully solved this (that would require MCP servers to provide `outputSchema`), but we've implemented a hack that works in practice:
+
+1. **Tool Classification** - We use an LLM to classify each tool as `read`, `write`, `destructive`, or `write_read` based on its semantics
+2. **Output Schema Discovery** - For tools classified as `read` or `write_read`, we generate safe sample inputs and actually call the tool
+3. **Schema Inference** - We capture the real response and infer a JSON schema from it
+4. **Typed SDK Generation** - The inferred schema is passed to the SDK generator, producing proper TypeScript output types
+
+This means tools like `search_engine` now generate SDKs with accurate output types based on real API responses, not guesses.
+
+**Limitations:**
+
+- Requires actually calling the tools during SDK generation
+- Single sample responses may miss optional fields or variant shapes
+- Write+Read tools create real data (we use identifiable test names like `codecall_test_*`)
+
+### Tool Outputs Are Often Plain Strings
+
+A second more fundamental challenge is that a lot of MCP servers return plain strings or markdown, not structured data...
+
+In these cases:
+
+- The output has no stable shape
+- There are no fields to index into
+- There is nothing meaningful to type beyond string
+
+From Codecall’s perspective, this means:
+
+- No reliable code generation beyond simple passthrough
+- No safe composition of tool outputs
+- No advantage over a traditional agent that directly interprets text
+
+This is not a limitation of Codecall, but a reflection of how the tools were designed.
+
+Because Codecall focuses on deterministic, type-safe code generation, its benefits disappear when tool outputs are unstructured. In those cases, interpretation must happen in the language model itself, which moves the system back into standard agent behavior.
+
+There is no reliable workaround when using external MCP servers: if you do not control the tool, you cannot enforce structured outputs.
+
 ## How Codecall Works (WIP)
 
 Instead of exposing every tool directly to the LLM for it to call, Codecall:
@@ -713,29 +773,6 @@ TypeScript also gives you:
 - Full type inference for SDK generation
 - Compile time validation of tool schemas
 - The model sees types and can use them correctly
-
-## Main Challenges
-
-### Output Schemas from Tools
-
-MCP tool definitions include `inputSchema` (what you pass to a tool) but `outputSchema` is **optional** and most servers almost never provide it.
-
-**Why this matters:** Codecall generates TypeScript code that chains tool calls together. Without knowing what a tool returns, the model has to guess the structure, leading to runtime errors.
-
-**Example of the problem:**
-
-```typescript
-const tasks = await tools.todoist.getTasks({ filter: "today" });
-
-for (const task of tasks) {
-  console.log(task.title);  // BUG: actual property is "name", not "title"
-}
-
-if (task.dueDate === "2024-01-15") { ... }
-// BUG: actual structure is task.due, not task.dueDate
-```
-
-The code looks correct but fails at runtime because the model hallucinated the return type based on common naming patterns.
 
 ## Roadmap
 
