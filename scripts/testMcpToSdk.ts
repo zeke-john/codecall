@@ -1,9 +1,22 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 
+import * as fs from "fs";
 import * as path from "path";
 import { MCPServerConfig } from "../src/mcp/mcpClient";
 import { generateVirtualSDKFromMCP } from "../src/sdk/generator";
+
+async function readGeneratedFile(filePath: string, baseDir = "generatedSdks") {
+  const fullPath = path.resolve(baseDir, filePath);
+  if (!fs.existsSync(fullPath)) {
+    console.error(`File not found: ${fullPath}`);
+    return;
+  }
+  const content = fs.readFileSync(fullPath, "utf-8");
+  console.log(`--- ${filePath} ---`);
+  console.log(content);
+  return content;
+}
 
 async function main() {
   if (!process.env.OPENROUTER_API_KEY) {
@@ -20,6 +33,7 @@ async function main() {
     console.log(
       "  npm run test:mcp -- http <url> [--skip-discovery] [--output <dir>]"
     );
+    console.log("  npm run test:mcp -- read <filePath> [--base <dir>]");
     console.log("\nOptions:");
     console.log(
       "  --skip-discovery  Skip output schema discovery (faster, but no output types)"
@@ -27,10 +41,26 @@ async function main() {
     console.log(
       "  --output <dir>    Write SDK files to disk (default: generatedSdks)"
     );
+    console.log(
+      "  --base <dir>      Base directory for read mode (default: generatedSdks)"
+    );
     process.exit(1);
   }
 
   const mode = args[0];
+
+  if (mode === "read") {
+    const filePath = args[1];
+    if (!filePath) {
+      console.error("File path required for read mode");
+      process.exit(1);
+    }
+    const baseIdx = args.indexOf("--base");
+    const baseDir =
+      baseIdx !== -1 && args[baseIdx + 1] ? args[baseIdx + 1] : "generatedSdks";
+    await readGeneratedFile(filePath, baseDir);
+    return;
+  }
   let config: MCPServerConfig;
   let skipDiscovery = false;
   let outputDir: string | undefined;
@@ -118,3 +148,5 @@ main().catch(console.error);
 // npm run test:mcp -- stdio npx @brightdata/mcp --env API_TOKEN=xxx --output generatedSdks
 //npm run test:mcp -- stdio npx @playwright/mcp@latest --output generatedSdks
 // --skip-discovery
+
+// npm run test:mcp -- read tools/bright_data/searchEngine.ts

@@ -124,72 +124,9 @@ return {
 
 One inference pass. ~2,000 tokens. 98.7% reduction.
 
-## Main Challenges (Recently Updated)
-
-### Output Schemas from Tools
-
-MCP tool definitions include `inputSchema` (what you pass to a tool) but `outputSchema` is **optional** and most servers almost never provide it.
-
-**Why this matters:** Codecall generates TypeScript code that chains tool calls together. Without knowing what a tool returns, the model has to guess the structure, leading to runtime errors.
-
-**Example of the problem:**
-
-```typescript
-const tasks = await tools.todoist.getTasks({ filter: "today" });
-
-for (const task of tasks) {
-  console.log(task.title);  // BUG: actual property is "name", not "title"
-}
-
-if (task.dueDate === "2024-01-15") { ... }
-// BUG: actual structure is task.due, not task.dueDate
-```
-
-The code looks correct but fails at runtime because the model hallucinated the return type based on common naming patterns...
-
-**OUR WORKAROUND:**
-We haven't fully solved this (that would require MCP servers to provide `outputSchema`), but we've implemented a hack that works in practice:
-
-1. **Tool Classification** - We use an LLM to classify each tool as `read`, `write`, `destructive`, or `write_read` based on its semantics
-2. **Output Schema Discovery** - For tools classified as `read` or `write_read`, we generate safe sample inputs and actually call the tool
-3. **Schema Inference** - We capture the real response and infer a JSON schema from it
-4. **Typed SDK Generation** - The inferred schema is passed to the SDK generator, producing proper TypeScript output types
-
-This means tools like `search_engine` now generate SDKs with accurate output types based on real API responses, not guesses.
-
-**Limitations:**
-
-- Requires actually calling the tools during SDK generation
-- Single sample responses may miss optional fields or variant shapes
-- Write+Read tools create real data (we use identifiable test names like `codecall_test_*`)
-
----
-
-### Tool Outputs Are Often Plain Strings (MAIN BLOCKER)
-
-A second more fundamental challenge is that a lot of MCP servers return plain strings or markdown, not structured data...
-
-In these cases:
-
-- The output has no stable shape
-- There are no fields to index into
-- There is nothing meaningful to type beyond string
-
-From Codecall’s perspective, this means:
-
-- No reliable code generation beyond simple passthrough
-- No safe composition of tool outputs
-- No advantage over a traditional agent that directly interprets text
-
-This is not a limitation of Codecall, but a reflection of how the tools were designed.
-
-Because Codecall focuses on deterministic, type-safe code generation, its benefits disappear when tool outputs are unstructured. In those cases, interpretation must happen in the language model itself, which moves the system back into standard agent behavior.
-
-There is no reliable workaround when using external MCP servers: if you do not control the tool, you cannot enforce structured outputs.
-
----
-
 ## How Codecall Works (WIP)
+
+Codecall gives the model 3 tools to work with so the model still controls the entire flow that decides what to read, what code to write, when to execute, and how to respond... so everything stays fully agentic.
 
 Instead of exposing every tool directly to the LLM for it to call, Codecall:
 
@@ -198,14 +135,18 @@ Instead of exposing every tool directly to the LLM for it to call, Codecall:
 - Allows the model to selectively read SDK files to understand types and APIs
 - Lets the model write code to accomplish the task
 - Executes that code in a deno sandbox with access to your actual tools as functions
-- Returns the execution result back to the same model in a 2nd request
-- Lets the model produce the final user-facing response
+- Returns the execution result back (success/error)
+- Lets the model produce a respond or continue
 
-Codecall uses two model requests per user turn: one to write code, and one to explain the execution result.
+### The 3 Available Tools:
 
-### SDK File Tree (What the Model Sees)
+#### 1. `listFiles()`
 
-At the start of every request, the model is shown only the file tree, not the contents of each file.
+Returns the SDK file tree showing all available tools as files
+
+Example:
+
+`listFiles()` ->
 
 ```
 tools/
@@ -225,20 +166,13 @@ tools/
 └─ ...
 ```
 
-This gives the model a high-level map of what capabilities exist without bloating the prompt with thousands of lines of schemas.
+#### 2. `readFile(path: string)`
 
-### Reading SDK Files (Discovering Tools)
+Returns the full contents of a specific SDK file, including type definitions, function signatures, and schemas.
 
-When the model needs to understand how a specific tool works, it can explicitly request the contents of a file using a built in `readFile` tool:
+Example:
 
-```typescript
-readFile({
-  module: "users",
-  name: "listAllUsers",
-});
-```
-
-This returns the entire contents of that SDK file, and each file contains type definitions for that tool, for example:
+`readFile({ path: "tools/users/listAllUsers.ts" });` ->
 
 ```typescript
 // /tools/users/listAllUsers.ts
@@ -263,127 +197,53 @@ export async function listAllUsers(input: ListAllUsersInput): Promise<User[]> {
 }
 ```
 
-The model can read only the files it needs which it can infer from the filenames, just like a developer opening files in an editor, instead of having every tool definition injected into context upfront.
+#### 3. `executeCode(code: string)`
 
-This keeps prompts small while still giving the model precise, typed knowledge of each tool before it writes code.
+Executes TypeScript code in a Deno sandbox. Returns either the successful output or an error w/ execution trace.
 
-### Writing Code
-
-After reading the relevant SDK files, the model writes a single TypeScript program like:
+Example:
 
 ```typescript
-const allUsers = await tools.users.listAllUsers({ limit: 1000 });
-progress({ step: "Loaded all users", count: allUsers.length });
+executeCode(`
+  const users = await tools.users.listAllUsers({ limit: 100 });
+  return users.filter(u => u.role === "admin");
+`);
+```
 
-const adminUsers = allUsers.filter((u) => u.role === "admin");
-progress({ step: "Identified admin users", count: adminUsers.length });
+Success returns:
 
-const sensitiveResources = await tools.resources.getSensitiveResources();
-progress({
-  step: "Loaded sensitive resources",
-  count: sensitiveResources.length,
-});
-
-const revokedAccesses = [];
-const failedAccesses = [];
-let processed = 0;
-
-for (const admin of adminUsers) {
-  for (const resource of sensitiveResources) {
-    processed++;
-    try {
-      const result = await tools.permissions.revokeAccess({
-        userId: admin.id,
-        resourceId: resource.id,
-        reason: "security-audit",
-      });
-
-      if (result.success) {
-        revokedAccesses.push({
-          adminName: admin.name,
-          adminEmail: admin.email,
-          resourceName: resource.name,
-          revokedAt: result.timestamp,
-        });
-      } else {
-        failedAccesses.push({
-          adminName: admin.name,
-          resourceName: resource.name,
-          reason: result.reason || "unknown",
-        });
-      }
-
-      if (processed % 10 === 0) {
-        progress({
-          step: "Revoking access",
-          processed,
-          total: adminUsers.length * sensitiveResources.length,
-        });
-      }
-    } catch (err) {
-      failedAccesses.push({
-        adminName: admin.name,
-        resourceName: resource.name,
-        error: err.message,
-      });
+```typescript
+    {
+      status: "success",
+      output: [
+        { id: "1", name: "Alice", role: "admin", ... },
+        { id: "2", name: "Bob", role: "admin", ... }
+      ]
     }
-  }
-}
 
-return {
-  summary: {
-    totalAdminsAffected: adminUsers.length,
-    totalResourcesAffected: sensitiveResources.length,
-    totalAccessProcessed: processed,
-    accessesRevoked: revokedAccesses.length,
-    accessesFailed: failedAccesses.length,
-    successRate: Math.round((revokedAccesses.length / processed) * 100),
-  },
-  revoked: revokedAccesses,
-  failed: failedAccesses.slice(0, 20),
-};
 ```
 
-SDK files exist only for the model to get the types and discoverability.
-
-Runtime execution never imports SDK files, it uses a tools bridge injected by Codecall.
-
-### How Tool Calls Work at Runtime
-
-When the generated code runs, Codecall injects a real `tools` object into the sandbox.
-
-- `tools` is not a set of local functions, but it's a small runtime bridge provided by Codecall
-- Each call to `tools.*` is forwarded to the real tool implementation
-
-So when the sandbox executes:
+Error returns:
 
 ```typescript
-const result = await tools.permissions.revokeAccess({
-  userId: admin.id,
-  resourceId: resource.id,
-  reason: "security-audit",
-});
+	{
+	  status: "error",
+	  error: "ToolError: revokeAccess expected object { userId: string, resourceId: string }, got (string, string)",
+	  executionTrace: [
+	    { step: 1, function: "listAllUsers", input: {}, output: [...] },
+	    { step: 2, function: "revokeAccess", input: ["admin-1", "resource-db-prod"], error: "Invalid Argument Schema" }
+	  ],
+	  failedCode: "const result = await tools.permissions.revokeAccess(admin.id, resource.id);"
+	}
 ```
-
-What actually happens is:
-
-- The sandbox captures the tool name (`"communications.sendSecureMessage"`) and arguments
-- Codecall forwards that request to the connected MCP server using `tools/call`
-- The MCP server executes the real tool
-- The result is returned back to the sandbox
-- The script continues running
-
-From the code’s perspective this behaves exactly like calling a normal async function.
 
 ### Code Execution & Sandboxing
 
-When the model finishes writing the TypeScript code, Codecall executes that code inside a fresh, short-lived sandbox. Each sandbox is spun up using Deno and runs the code in isolation. Deno’s security model blocks access to sensitive capabilities unless explicitly allowed.
+When the model calls `executeCode()`, Codecall runs that code inside a fresh, short-lived Deno sandbox. Each sandbox. Each sandbox is spun up using Deno and runs the code in isolation. Deno’s security model blocks access to sensitive capabilities unless explicitly allowed.
 
 By default, the sandboxed code has no access to the filesystem, network, environment variables, or system processes. The only way it can interact with the outside world is by calling the tool functions exposed through tools (which are forwarded by Codecall to the MCP server).
 
-Every execution is independent. Retries in the recovery loop run in a new sandbox if it errors, which keeps execution fast, predictable, and easy to reason about while preventing state from leaking between runs.
-
-#### Sandbox Lifecycle Diagram
+#### Sandbox Lifecycle
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
@@ -418,7 +278,7 @@ Every execution is independent. Retries in the recovery loop run in a new sandbo
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### Data Flow Diagram
+#### Data Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
@@ -456,205 +316,43 @@ Every execution is independent. Retries in the recovery loop run in a new sandbo
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Returning Results to the Model
+### How Tool Calls Work at Runtime
 
-After the sandbox finishes executing the generated code, Codecall returns the final result object, with the same conversation history as the original user request back to the same model so it can produce a user-facing response.
+When the generated code runs, Codecall injects a real `tools` object into the sandbox.
 
-This happens in a second model request, so the flow looks like this:
+- `tools` is not a set of local functions, but it's a small runtime bridge provided by Codecall
+- Each call to `tools.*` is forwarded to the real tool implementation
 
-1. Code Generation (Request 1)
-
-   - Model sees the tool tree and reads SDK files as needed
-   - Model writes a single TypeScript script to perform what action is needed
-
-2. Sandbox Execution
-
-   - Codecall runs the program in an isolated sandbox
-   - Tools are invoked via `tools.*`
-   - A final result object is produced
-
-3. Response Generation (Request 2)
-   - The result object is sent back to the same model in another request (#2)
-   - The model explains the outcome to the user in natural language, which is the user-facing response
-
-For example, after execution completes:
+So when the the model calls `executeCode()` w/ tools:
 
 ```typescript
-{
-  summary: {
-    totalAdminsAffected: 12,
-    totalResourcesAffected: 5,
-    totalAccessProcessed: 60,
-    accessesRevoked: 58,
-    accessesFailed: 2,
-    successRate: 97,
-  },
-  revoked: [
-    { adminName: "Alice Chen", adminEmail: "alice@company.com", resourceName: "Production Database", revokedAt: "2025-12-27T18:05:32Z" },
-    { adminName: "Bob Smith", adminEmail: "bob@company.com", resourceName: "Production Database", revokedAt: "2025-12-27T18:05:33Z" },
-    // ... 56 more entries (you can modify how much data you want the llm to return with in your prompt)
-  ],
-  failed: [
-    { adminName: "Charlie Davis", resourceName: "API Gateway", reason: "dependency-lock" },
-    { adminName: "Diana Wong", resourceName: "Billing System", error: "timeout after 30s" },
-  ],
-}
+const result = await tools.permissions.revokeAccess({
+  userId: admin.id,
+  resourceId: resource.id,
+  reason: "security-audit",
+});
 ```
 
-The model receives that result and responds:
+What actually happens is:
 
-> “I successfully revoked admin access across the organization. Out of 60 total access permissions (12 admins across 5 sensitive resources), I revoked 58 successfully with a 97% success rate. 2 revocations failed due to system locks and timeouts that will need manual intervention. The revoked admins include Alice Chen, Bob Smith, and 10 others. Most failures occurred on the API Gateway and Billing System where there are active dependencies preventing immediate access removal.”
+- The sandbox captures the tool name (`"communications.sendSecureMessage"`) and arguments
+- Codecall forwards that request to the connected MCP server using `tools/call`
+- The MCP server executes the real tool
+- The result is returned back to the sandbox
+- The script continues running
 
-## Handling Errors (v2)
-
-Real world API data is messy so pre-written code can (and will) fail. Codecall handles this with an automatic recovery loop:
-
-### The Recovery Loop
-
-1. **Optimistic Execution**: Codecall tries to run the agent's generated code
-2. **Failure Capture**: If the code throws an error, we capture the full execution trace (inputs, outputs, and the specific error)
-3. **Feedback Loop**: We feed this trace back to the model
-4. **Correction**: The model sees exactly where and why it failed, adjusts its approach, and retries keeping the main task in mind
-
-### Example
-
-**1. Agent writes optimistic code:**
-
-```typescript
-const allUsers = await tools.users.listAllUsers();
-progress({ step: "Loaded users", count: allUsers.length });
-
-const adminUsers = allUsers.filter((u) => u.role === "admin");
-const resources = await tools.resources.getSensitiveResources();
-progress({ step: "Loaded resources", count: resources.length });
-
-const revoked = [];
-for (const admin of adminUsers) {
-  for (const resource of resources) {
-    await tools.permissions.revokeAccess(admin.id, resource.id);
-    revoked.push({ admin: admin.name, resource: resource.name });
-  }
-}
-
-return { totalRevoked: revoked.length };
-```
-
-**2. Execution fails. Codecall catches and returns:**
-
-```typescript
-{
-  "status": "failed",
-  "error": "ToolError: revokeAccess expected object { userId: string, resourceId: string }, got (string, string)",
-  "executionTrace": [
-    {
-      "step": 1,
-      "function": "listAllUsers",
-      "input": {},
-      "output": { "count": 47, "users": [{ "id": "admin-1", "name": "Alice", "role": "admin" }, ...] }
-    },
-    {
-      "step": 2,
-      "progress": "Loaded users",
-      "data": { "count": 47 }
-    },
-    {
-      "step": 3,
-      "function": "getSensitiveResources",
-      "input": {},
-      "output": { "count": 5, "resources": [{ "id": "resource-db-prod", "name": "Production Database" }, ...] }
-    },
-    {
-      "step": 4,
-      "progress": "Loaded resources",
-      "data": { "count": 5 }
-    },
-    {
-      "step": 5,
-      "function": "revokeAccess",
-      "input": ["admin-1", "resource-db-prod"],
-      "error": "Invalid Argument Schema. Expected { userId, resourceId }, got positional arguments"
-    }
-  ],
-  "failurePoint": "step 5",
-  "context": "The function revokeAccess was called with positional arguments instead of an object. The sandbox successfully loaded 47 users and 5 resources before failing on the first access revocation."
-}
-```
-
-**3. Agent self-corrects and retries:**
-
-```typescript
-const allUsers = await tools.users.listAllUsers();
-progress({ step: "Loaded users", count: allUsers.length });
-
-const adminUsers = allUsers.filter((u) => u.role === "admin");
-const resources = await tools.resources.getSensitiveResources();
-progress({ step: "Loaded resources", count: resources.length });
-
-const revokedAccesses = [];
-const failedAccesses = [];
-let processed = 0;
-
-for (const admin of adminUsers) {
-  for (const resource of resources) {
-    processed++;
-    try {
-      const result = await tools.permissions.revokeAccess({
-        userId: admin.id,
-        resourceId: resource.id,
-      });
-
-      if (result.success) {
-        revokedAccesses.push({
-          adminName: admin.name,
-          resourceName: resource.name,
-        });
-      } else {
-        failedAccesses.push({
-          adminName: admin.name,
-          resourceName: resource.name,
-          reason: result.reason,
-        });
-      }
-
-      if (processed % 15 === 0) {
-        progress({
-          step: "Revoking access",
-          processed,
-          total: adminUsers.length * resources.length,
-        });
-      }
-    } catch (err) {
-      failedAccesses.push({
-        adminName: admin.name,
-        resourceName: resource.name,
-        error: err.message,
-      });
-    }
-  }
-}
-
-return {
-  summary: {
-    totalAdmins: adminUsers.length,
-    totalResources: resources.length,
-    processed,
-    revoked: revokedAccesses.length,
-    failed: failedAccesses.length,
-  },
-  revokedSample: revokedAccesses.slice(0, 10),
-  failedDetails: failedAccesses,
-};
-```
-
-On failure, Codecall returns the error, full execution trace, the TypeScript code which failed, and the original user request with the main task to the model. The sandbox is destroyed after each run, but the trace is preserved.
-
-The model then rewrites the code (in another request) and Codecall reruns it in a fresh sandbox, retrying until it succeeds or hits a configurable limit (default 3). If the limit is reached, Codecall stops and returns a clear failure.
-
-Finally, Codecall returns the user response: on success returns the result object from the code, and on failure it explains where and why it failed so we can let the user know.
+From the code’s perspective this behaves exactly like calling a normal async function.
 
 ## Progress Updates (v2)
 
-Codecall runs code in one shot, but you would still most likely want some user facing intermediate updates between the start and end of a request. The sandbox exposes a `progress()` helper that can log the steps it's taking
+The model can use `progress()` when writing code to provide real time feedback during long-running operations. While the model could also achieve progress by making multiple smaller `executeCode()` calls, using `progress()` within a single execution is more efficient, gives better context, and reduces the number of steps too.
+
+Because Codecall's main benefit comes from executing comprehensive code in a single pass,
+progress updates are important for two reasons:
+
+1. **Better UX**: Users see real-time feedback during long-running operations without multiple model calls adding cost and latency
+
+2. **Model awareness**: The model receives progress logs in the `executeCode()` response and can reference them in its final explanation
 
 So for example, in your system prompt you can tell the model to use `progress()`:
 
@@ -778,6 +476,66 @@ TypeScript also gives you:
 - Full type inference for SDK generation
 - Compile time validation of tool schemas
 - The model sees types and can use them correctly
+
+## Main Challenges
+
+### Output Schemas from Tools
+
+MCP tool definitions include `inputSchema` (what you pass to a tool) but `outputSchema` is **optional** and most servers almost never provide it... This matters Codecall generates TypeScript code that chains tool calls together. Without knowing what a tool returns, the model has to guess the structure, leading to runtime errors.
+
+**Example of the problem:**
+
+```typescript
+const tasks = await tools.todoist.getTasks({ filter: "today" });
+
+for (const task of tasks) {
+  console.log(task.title);  // BUG: actual property is "name", not "title"
+}
+
+if (task.dueDate === "2024-01-15") { ... }
+// BUG: actual structure is task.due, not task.dueDate
+```
+
+The code looks correct but fails at runtime because the model hallucinated the return type based on common naming patterns...
+
+#### Our Workaround
+
+We haven't fully solved this (that would require MCP servers to provide `outputSchema`), but we've implemented a hack that works in practice:
+
+1. **Tool Classification** - We use an LLM to classify each tool as `read`, `write`, `destructive`, or `write_read` based on its semantics
+2. **Output Schema Discovery** - For tools classified as `read` or `write_read`, we generate safe sample inputs and actually call the tool
+3. **Schema Inference** - We capture the real response and infer a JSON schema from it
+4. **Typed SDK Generation** - The inferred schema is passed to the SDK generator, producing proper TypeScript output types
+
+This means tools like `search_engine` now generate SDKs with accurate output types based on real API responses, not guesses.
+
+**Limitations:**
+
+- Requires actually calling the tools during SDK generation
+- Single sample responses may miss optional fields or variant shapes
+- Write+Read tools create real data (we use identifiable test names like `codecall_test_*`)
+
+### Tool Outputs Are Often Plain Strings
+
+A second more fundamental challenge is that a lot of MCP servers return plain strings or markdown, not structured data...
+
+In these cases:
+
+- The output has no stable shape
+- There are no fields to index into
+- There is nothing meaningful to type beyond string
+
+From Codecall’s perspective, this means:
+
+- No reliable code generation beyond simple passthrough
+- No safe composition of tool outputs
+- No advantage over a traditional agent that directly interprets text
+
+This is not a limitation of Codecall, but a reflection of how the tools were designed.
+
+Because Codecall focuses on deterministic, type-safe code generation, its benefits disappear when tool outputs are unstructured. In those cases, interpretation must happen in the language model itself, which moves the system back into standard agent behavior.
+
+**Sadly, there is no reliable workaround when using external MCP servers: if you do not control the tool, you cannot enforce structured outputs.**
 
 ## Roadmap
 
