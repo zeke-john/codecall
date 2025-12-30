@@ -160,9 +160,9 @@ tools/
 │ ├─ grantAccess.ts
 │ ├─ listPermissions.ts
 │ └─ ...
-└─ resources/
-├─ getSensitiveResources.ts
-├─ listResources.ts
+├─ resources/
+│ getSensitiveResources.ts
+│ listResources.ts
 └─ ...
 ```
 
@@ -199,7 +199,7 @@ export async function listAllUsers(input: ListAllUsersInput): Promise<User[]> {
 
 #### 3. `executeCode(code: string)`
 
-Executes TypeScript code in a Deno sandbox. Returns either the successful output or an error w/ execution trace.
+Executes TypeScript code in a Deno sandbox. Returns either the successful output or an error w/ the execution trace.
 
 Example:
 
@@ -335,7 +335,7 @@ const result = await tools.permissions.revokeAccess({
 
 What actually happens is:
 
-- The sandbox captures the tool name (`"communications.sendSecureMessage"`) and arguments
+- The sandbox captures the tool name (`"permissions.revokeAccess"`) and arguments
 - Codecall forwards that request to the connected MCP server using `tools/call`
 - The MCP server executes the real tool
 - The result is returned back to the sandbox
@@ -352,7 +352,7 @@ progress updates are important for two reasons:
 
 1. **Better UX**: Users see real-time feedback during long-running operations without multiple model calls adding cost and latency
 
-2. **Model awareness**: The model receives progress logs in the `executeCode()` response and can reference them in its final explanation
+2. **Model awareness**: The model receives progress logs in the `executeCode()` response and can reference them when explaining what it did.
 
 So for example, in your system prompt you can tell the model to use `progress()`:
 
