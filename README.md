@@ -533,7 +533,7 @@ From Codecall’s perspective, this means:
 
 This is not a limitation of Codecall, but a reflection of how the tools were designed.
 
-Because Codecall focuses on deterministic, type-safe code generation, its benefits disappear when tool outputs are unstructured. In those cases, interpretation must happen in the language model itself, which moves the system back into standard agent behavior.
+Because Codecall focuses on deterministic, type-safe code generation, its benefits disappear when tool outputs are unstructured. In those cases, interpretation must happen in the LLM itself, which moves the system back into standard agent behavior.
 
 **Sadly, there is no reliable workaround when using external MCP servers: if you do not control the tool, you cannot enforce structured outputs.**
 
