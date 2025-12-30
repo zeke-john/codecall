@@ -24,10 +24,10 @@ Traditional tool calling has fundamental architectural issues that get worse at 
 Every tool definition lives in your system prompt. Connect a few MCP servers and you're burning tens of thousands of tokens before the conversation even starts.
 
 ```
-GitHub MCP:        16 tools  →  ~32,000 tokens
+GitHub MCP:        32 tools  →  ~60,000 tokens
 Internal Tools:    12 tools  →  ~24,000 tokens
 ───────────────────────────────────────────────
-Total:             28 tools  →  ~56,000 tokens (before any work happens)
+Total:             44 tools  →  ~84,000 tokens (before any work happens)
 ```
 
 ### 2. Inference Overhead
@@ -243,7 +243,7 @@ When the model calls `executeCode()`, Codecall runs that code inside a fresh, sh
 
 By default, the sandboxed code has no access to the filesystem, network, environment variables, or system processes. The only way it can interact with the outside world is by calling the tool functions exposed through tools (which are forwarded by Codecall to the MCP server).
 
-#### Sandbox Lifecycle
+#### Sandbox Lifecycle (Deno isolates)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
@@ -258,22 +258,6 @@ By default, the sandboxed code has no access to the filesystem, network, environ
 │   process with    + progress()    TypeScript       value or error   process,            │
 │   deny-all        injected        code             + exec trace     cleanup             │
 │   permissions                                                                           │
-│                                                                                         │
-│                                                                                         │
-│   ON ERROR:                                                                             │
-│   ┌─────────────────────────────────────────────────────────────────────────┐           │
-│   │                                                                         │           │
-│   │   Error + Trace + Original Code + User Request                          │           │
-│   │                        │                                                │           │
-│   │                        ▼                                                │           │
-│   │              ┌─────────────────┐                                        │           │
-│   │              │   Model (LLM)   │  Rewrites code to fix issue            │           │
-│   │              └────────┬────────┘                                        │           │
-│   │                       │                                                 │           │
-│   │                       ▼                                                 │           │
-│   │              NEW SANDBOX SPAWNED ───────────────────▶ Retry (max 3)     │           │
-│   │                                                                         │           │
-│   └─────────────────────────────────────────────────────────────────────────┘           │
 │                                                                                         │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
