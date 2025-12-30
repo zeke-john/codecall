@@ -122,7 +122,7 @@ return {
 };
 ```
 
-One inference pass. ~2,000 tokens. 98.7% reduction.
+One inference pass. [~2,000 tokens. 98.7% reduction.](https://www.anthropic.com/engineering/code-execution-with-mcp)
 
 ## How Codecall Works (WIP)
 
