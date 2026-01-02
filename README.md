@@ -174,8 +174,12 @@ Example:
 `readFile({ path: "tools/users/listAllUsers.ts" });` ->
 
 ```typescript
-// /tools/users/listAllUsers.ts
-// SDK stub for tool: "users.listAllUsers"
+/**
+ * HOW TO CALL THIS TOOL:
+ * await tools.users.listAllUsers({ limit: 100, offset: 0 })
+ *
+ * This is the ONLY way to invoke this tool in your code.
+ */
 
 export interface ListAllUsersInput {
   limit?: number;
@@ -191,9 +195,7 @@ export interface User {
   createdAt: string;
 }
 
-export async function listAllUsers(input: ListAllUsersInput): Promise<User[]> {
-  return call("users.listAllUsers", input);
-}
+export async function listAllUsers(input: ListAllUsersInput): Promise<User[]>;
 ```
 
 #### 3. `executeCode(code: string)`
@@ -548,6 +550,13 @@ The code is type-correct but semantically wrong. With traditional tool calling, 
 During SDK generation, we already call tools to discover output schemas so we are also going do this by capturing both the input used and the output received, then embedding them as clearly labeled comments in the generated SDK files:
 
 ```typescript
+/**
+ * HOW TO CALL THIS TOOL:
+ * await tools.brightData.searchEngine({ query: "...", engine: "google" })
+ *
+ * This is the ONLY way to invoke this tool in your code.
+ */
+
 export interface SearchEngineInput {
   query: string;
   engine?: "google" | "bing" | "yandex";
@@ -560,9 +569,7 @@ export interface SearchEngineOutput {
 
 /*
  * INPUT EXAMPLE:
- * {
- *   "query": "typescript tutorials"
- * }
+ * { "query": "typescript tutorials" }
  *
  * OUTPUT EXAMPLE:
  * {
@@ -576,9 +583,7 @@ export interface SearchEngineOutput {
 
 export async function searchEngine(
   input: SearchEngineInput
-): Promise<SearchEngineOutput> {
-  return call("search_engine", input);
-}
+): Promise<SearchEngineOutput>;
 ```
 
 When the model reads the SDK file, it sees real examples from actual API calls. This teaches:

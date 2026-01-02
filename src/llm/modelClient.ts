@@ -56,17 +56,28 @@ export async function generateSDKFromLLM(
 ): Promise<GeneratedSDK> {
   const systemPrompt = `You are a TypeScript SDK generator. Given raw MCP tool definitions, generate clean, well-typed SDK files.
 
+These SDK files are read by an LLM to understand available tools. The LLM writes executable code using ONLY this pattern:
+  await tools.{folderName}.{functionName}(input)
+
+This is the ONLY way to call these functions at runtime. The function declarations below are for type reference only.
+
 RULES:
-1. Extract ALL information from the tool definition
-2. Convert JSON Schema types to TypeScript (string, number, boolean, arrays, objects)
-3. Use union types for enums (e.g., priority: 1 | 2 | 3 | 4)
-4. Mark optional fields with ? based on the "required" array
-5. Add JSDoc comments from descriptions
-6. Preserve the original tool name in the call() function
+1. EVERY file must start with a header comment block showing the exact call pattern:
+   /**
+    * HOW TO CALL THIS TOOL:
+    * await tools.{folderName}.{functionName}({ ...params })
+    *
+    * This is the ONLY way to invoke this tool in your code.
+    */
+
+2. Extract ALL information from the tool definition
+3. Convert JSON Schema types to TypeScript (string, number, boolean, arrays, objects)
+4. Use union types for enums (e.g., priority: 1 | 2 | 3 | 4)
+5. Mark optional fields with ? based on the "required" array
+6. Add JSDoc comments from descriptions
 7. Use camelCase for function/file names, PascalCase for interfaces
-8. DO NOT add any logic - just type definitions and the call() stub
-9. Each file should have an Input interface and an async function
-10. The function should return call("original_tool_name", input)
+8. Each file should have an Input interface and an async function DECLARATION (no body)
+9. The function should be a declaration ending with semicolon: export async function name(input: Input): Promise<Output>;
 
 Return ONLY valid JSON with no markdown formatting, no code blocks, just raw JSON:
 {
@@ -111,24 +122,36 @@ Generate the SDK files. Remember to return ONLY valid JSON, no markdown.`;
 const CLASSIFIED_SDK_SYSTEM_PROMPT = `
 You are a TypeScript SDK generator. Given MCP tool definitions with their classifications, output schemas, and real examples, generate clean, well-typed SDK files.
 
+These SDK files are read by an LLM to understand available tools. The LLM writes executable code using ONLY this pattern:
+  await tools.{folderName}.{functionName}(input)
+
+This is the ONLY way to call these functions at runtime. The function declarations below are for type reference only.
+
 RULES:
-1. Extract ALL information from the tool definition including inputSchema AND outputSchema when provided
-2. Convert JSON Schema types to TypeScript (string, number, boolean, arrays, objects)
-3. Use union types for enums (e.g., priority: 1 | 2 | 3 | 4)
-4. Mark optional fields with ? based on the "required" array
-5. Add JSDoc comments from descriptions
-6. Preserve the original tool name in the call() function
-7. Use camelCase for function/file names, PascalCase for interfaces
-8. DO NOT add any logic - just type definitions and the call() stub
-9. Each file should have an Input interface and an async function
-10. The function should return call("original_tool_name", input)
-11. When outputSchema is provided, create an Output interface and type the function return as Promise<Output>
-12. For tools with category "read" or "write_read", the output type is critical - use the exact outputSchema structure
-13. For tools with category "write" or "destructive", the return type can be Promise<void> or a simple success type
-14. When sampleInput and sampleOutput are provided, include them as a clearly labeled comment block BEFORE the function definition
-15. Format the examples as a multi-line comment with "INPUT EXAMPLE:" and "OUTPUT EXAMPLE:" labels so they are not confused
-16. Pretty-print the JSON examples for readability (2-space indent)
-17. Truncate very large output examples to first few items if the array is long (show first 2-3 items then add "// ... more items")
+1. EVERY file must start with a header comment block showing the exact call pattern:
+   /**
+    * HOW TO CALL THIS TOOL:
+    * await tools.{folderName}.{functionName}({ ...params })
+    *
+    * This is the ONLY way to invoke this tool in your code.
+    */
+
+2. Extract ALL information from the tool definition including inputSchema AND outputSchema when provided
+3. Convert JSON Schema types to TypeScript (string, number, boolean, arrays, objects)
+4. Use union types for enums (e.g., priority: 1 | 2 | 3 | 4)
+5. Mark optional fields with ? based on the "required" array
+6. Use camelCase for function/file names, PascalCase for interfaces
+7. Each file should have Input interface, Output interface (when available), and an async function DECLARATION (no body)
+8. The function should be a declaration ending with semicolon, NOT an implementation: export async function name(input: Input): Promise<Output>;
+9. When outputSchema is provided, create an Output interface and type the function return as Promise<Output>
+10. For tools with category "read" or "write_read", the output type is critical - use the exact outputSchema structure
+11. For tools with category "write" or "destructive", the return type can be Promise<void> or a simple success type
+12. When sampleInput and sampleOutput are provided, include them as a clearly labeled comment block BEFORE the function
+13. Format the examples as a multi-line comment with "INPUT EXAMPLE:" and "OUTPUT EXAMPLE:" labels so they are not confused
+14. Pretty-print the JSON examples for readability (2-space indent)
+15. Truncate very large output examples to first few items if the array is long (show first 2-3 items then add "// ... more items")
+
+IMPORTANT: Do NOT include any function body or call() - just the function declaration signature.
 
 Return ONLY valid JSON with no markdown formatting, no code blocks, just raw JSON:
 {

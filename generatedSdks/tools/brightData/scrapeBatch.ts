@@ -1,16 +1,19 @@
+/**
+ * HOW TO CALL THIS TOOL:
+ * await tools.brightData.scrapeBatch({ ...params })
+ *
+ * This is the ONLY way to invoke this tool in your code.
+ */
+
 export interface ScrapeBatchInput {
-  /**
-   * Array of URLs to scrape (max 10)
-   */
+  /** Array of URLs to scrape (max 10) */
   urls: string[];
 }
 
-export interface ScrapeBatchOutputItem {
+export type ScrapeBatchOutput = {
   url?: string;
   content?: string;
-}
-
-export type ScrapeBatchOutput = ScrapeBatchOutputItem[];
+}[];
 
 /**
  * INPUT EXAMPLE:
@@ -25,20 +28,12 @@ export type ScrapeBatchOutput = ScrapeBatchOutputItem[];
  * [
  *   {
  *     "url": "https://example.com",
- *     "content": "Example Domain\n\n# Example Domain\n\nThis domain is for use in documentation examples..."
+ *     "content": "Example Domain\n\n# Example Domain..."
  *   },
  *   {
  *     "url": "https://www.iana.org",
- *     "content": "Internet Assigned Numbers Authority       \n\n# Internet Assigned Numbers Authority..."
+ *     "content": "Internet Assigned Numbers Authority..."
  *   }
  * ]
  */
-
-/**
- * Scrape multiple webpages URLs with advanced options for content extraction and get back the results in MarkDown language. This tool can unlock any webpage even if it uses bot detection or CAPTCHA.
- */
-export async function scrapeBatch(
-  input: ScrapeBatchInput
-): Promise<ScrapeBatchOutput> {
-  return call("scrape_batch", input);
-}
+export async function scrapeBatch(input: ScrapeBatchInput): Promise<ScrapeBatchOutput>;

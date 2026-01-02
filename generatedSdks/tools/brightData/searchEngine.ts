@@ -1,9 +1,13 @@
+/**
+ * HOW TO CALL THIS TOOL:
+ * await tools.brightData.searchEngine({ ...params })
+ *
+ * This is the ONLY way to invoke this tool in your code.
+ */
+
 export interface SearchEngineInput {
   query: string;
   engine?: "google" | "bing" | "yandex";
-  /**
-   * Pagination cursor for next page
-   */
   cursor?: string;
 }
 
@@ -48,43 +52,30 @@ export interface SearchEngineOutput {
  *       "source": "BBC",
  *       "display_link": "https://www.bbc.com › news › world",
  *       "title": "World | Latest News & Updates",
- *       "description": "World · Around 40 dead in Swiss ski resort bar fire, police say · Deadly clashes between protesters and security forces as Iran unrest grows · Stranger Things ...Read more",
+ *       "description": "World · Around 40 dead in Swiss ski resort bar fire, police say · Deadly clashes between protesters and security forces as Iran unrest grows · Stranger Things ...",
  *       "extensions": [
  *         {
  *           "inline": true,
  *           "type": "text",
- *           "text": "22 hours ago",
+ *           "text": "23 hours ago",
  *           "rank": 1
- *         },
- *         {
- *           "type": "site_link",
- *           "text": "BBC World",
- *           "link": "https://www.bbc.com/news/world_radio_and_tv",
- *           "rank": 2
  *         }
- *         // ... more items
  *       ],
  *       "rank": 1,
- *       "global_rank": 7
+ *       "global_rank": 6
  *     }
+ *     // ... more items
  *   ],
  *   "images": [],
  *   "current_page": 1,
  *   "related": [
  *     {
- *       "text": "Breaking news today",
- *       "link": "https://www.google.com/search?sca_esv=18e49b020ebfc0ba&hl=en&q=Breaking+news+today&sa=X&ved=2ahUKEwioqcWm7OuRAxXqkokEHWclIcsQ1QJ6BAgyEAE",
+ *       "text": "World News today live",
+ *       "link": "https://www.google.com/search?q=...",
  *       "rank": 1,
- *       "global_rank": 16
+ *       "global_rank": 15
  *     }
- *   ],
- *   "ai_overview": null
+ *   ]
  * }
  */
-
-/**
- * Scrape search results from Google, Bing or Yandex. Returns SERP results in JSON or Markdown (URL, title, description), Ideal forgathering current information, news, and detailed search results.
- */
-export async function searchEngine(input: SearchEngineInput): Promise<SearchEngineOutput> {
-  return call("search_engine", input);
-}
+export async function searchEngine(input: SearchEngineInput): Promise<SearchEngineOutput>;
