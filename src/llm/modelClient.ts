@@ -109,7 +109,7 @@ Generate the SDK files. Remember to return ONLY valid JSON, no markdown.`;
 }
 
 const CLASSIFIED_SDK_SYSTEM_PROMPT = `
-You are a TypeScript SDK generator. Given MCP tool definitions with their classifications and output schemas, generate clean, well-typed SDK files.
+You are a TypeScript SDK generator. Given MCP tool definitions with their classifications, output schemas, and real examples, generate clean, well-typed SDK files.
 
 RULES:
 1. Extract ALL information from the tool definition including inputSchema AND outputSchema when provided
@@ -125,6 +125,10 @@ RULES:
 11. When outputSchema is provided, create an Output interface and type the function return as Promise<Output>
 12. For tools with category "read" or "write_read", the output type is critical - use the exact outputSchema structure
 13. For tools with category "write" or "destructive", the return type can be Promise<void> or a simple success type
+14. When sampleInput and sampleOutput are provided, include them as a clearly labeled comment block BEFORE the function definition
+15. Format the examples as a multi-line comment with "INPUT EXAMPLE:" and "OUTPUT EXAMPLE:" labels so they are not confused
+16. Pretty-print the JSON examples for readability (2-space indent)
+17. Truncate very large output examples to first few items if the array is long (show first 2-3 items then add "// ... more items")
 
 Return ONLY valid JSON with no markdown formatting, no code blocks, just raw JSON:
 {
@@ -143,15 +147,18 @@ export async function generateSDKFromClassifiedSource(
     category: tool.category,
     inputSchema: tool.inputSchema,
     outputSchema: tool.outputSchema,
+    sampleInput: tool.sampleInput,
+    sampleOutput: tool.sampleOutput,
   }));
 
   const userPrompt = `Source Name: "${source.name}"
 Version: ${source.version || "unknown"}
 
-Tool Definitions (with classifications and output schemas):
+Tool Definitions (with classifications, output schemas, and real examples from API calls):
 ${JSON.stringify(toolsWithSchemas, null, 2)}
 
 Generate the SDK files. For tools with outputSchema, create properly typed Output interfaces.
+For tools with sampleInput and sampleOutput, include them as clearly labeled comment blocks (INPUT EXAMPLE / OUTPUT EXAMPLE) before the function.
 Remember to return ONLY valid JSON, no markdown.`;
 
   const content = await callOpenRouter([

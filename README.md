@@ -6,8 +6,7 @@ Codecall changes how agents interact with tools by letting them **write and exec
 
 Works with **MCP servers** and **standard tool definitions**.
 
-> [!NOTE]
-> **Before reading** :)
+> [!NOTE] > **Before reading** :)
 >
 > Please keep in mind all of this is the **future plan** for Codecall and how it will work. Codecall is still a WIP and not production ready.
 >
@@ -520,6 +519,81 @@ This is not a limitation of Codecall, but a reflection of how the tools were des
 Because Codecall focuses on deterministic, type-safe code generation, its benefits disappear when tool outputs are unstructured. In those cases, interpretation must happen in the LLM itself, which moves the system back into standard agent behavior.
 
 **Sadly, there is no reliable workaround when using external MCP servers: if you do not control the tool, you cannot enforce structured outputs.**
+
+### Missing Input Examples
+
+tool definitions don't include usage examples. Unlike Anthropic's `input_examples` feature (which improved their internal accuracy from 72% to 90% on complex parameter handling), there's no standard way for MCP servers to communicate:
+
+- **Format conventions**: Should `due_date` use `"2024-11-06"`, `"Nov 6, 2024"`, or ISO 8601?
+- **ID patterns**: Is `reporter.id` a UUID, `"USR-12345"`, or just `"12345"`?
+- **Optional parameter correlations**: When does `priority: "critical"` require an `escalation` object?
+- **Minimal vs full usage patterns**: What's the difference between a bug report, feature request, and internal task?
+
+**Example of the problem:**
+
+```typescript
+for (const issue of issues) {
+  await tools.tickets.create({
+    title: issue.title,
+    due_date: issue.dueDate, // Wrong format? ISO 8601? Unix timestamp?
+    reporter: { id: issue.userId }, // "USR-" prefix required? UUID?
+  });
+}
+```
+
+The code is type-correct but semantically wrong. With traditional tool calling, one failure leads to adjustment. With Codecall, the loop creates many malformed entries before failing.
+
+#### Our Approach
+
+During SDK generation, we already call tools to discover output schemas so we are also going do this by capturing both the input used and the output received, then embedding them as clearly labeled comments in the generated SDK files:
+
+```typescript
+export interface SearchEngineInput {
+  query: string;
+  engine?: "google" | "bing" | "yandex";
+}
+
+export interface SearchEngineOutput {
+  organic?: { link?: string; title?: string; rank?: number }[];
+  current_page?: number;
+}
+
+/*
+ * INPUT EXAMPLE:
+ * {
+ *   "query": "typescript tutorials"
+ * }
+ *
+ * OUTPUT EXAMPLE:
+ * {
+ *   "organic": [
+ *     { "link": "https://...", "title": "Learn TypeScript", "rank": 1 },
+ *     { "link": "https://...", "title": "TypeScript Handbook", "rank": 2 }
+ *   ],
+ *   "current_page": 1
+ * }
+ */
+
+export async function searchEngine(
+  input: SearchEngineInput
+): Promise<SearchEngineOutput> {
+  return call("search_engine", input);
+}
+```
+
+When the model reads the SDK file, it sees real examples from actual API calls. This teaches:
+
+- **Format conventions**: The exact date/ID formats the API expects and returns
+- **Field names**: Real property names from responses (not hallucinated guesses)
+- **Data shapes**: How nested objects and arrays are structured
+
+This happens automatically during SDK generation with no manual curation required.
+
+**Limitations:**
+
+- Examples come from a single API call, so they may not show all optional fields or edge cases
+- Very large responses are truncated to keep SDK files readable
+- If the discovery call fails, the tool is generated without examples (v2 auto retry or have human give example)
 
 ## Roadmap
 

@@ -57,6 +57,10 @@ export async function discoverOutputSchemas(
     string,
     ReturnType<typeof inferSchemaFromResponse>
   >();
+  const sampleExamples = new Map<
+    string,
+    { input: Record<string, unknown>; output: unknown }
+  >();
 
   for (const { tool, category } of toolsNeedingSchema) {
     const sampleInput = sampleInputs.get(tool.name);
@@ -101,16 +105,23 @@ export async function discoverOutputSchemas(
         .join("\n")
     );
     outputSchemas.set(tool.name, schema);
+    sampleExamples.set(tool.name, {
+      input: sampleInput,
+      output: result.content,
+    });
   }
 
   const classifiedTools: ClassifiedTool[] = source.tools.map((tool) => {
     const category = classifications.get(tool.name) || "write";
     const outputSchema = outputSchemas.get(tool.name);
+    const examples = sampleExamples.get(tool.name);
 
     return {
       ...tool,
       category,
       outputSchema,
+      sampleInput: examples?.input,
+      sampleOutput: examples?.output,
     };
   });
 

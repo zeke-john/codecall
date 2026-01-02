@@ -35,6 +35,8 @@ export type ToolCategory = "read" | "write" | "destructive" | "write_read";
 export interface ClassifiedTool extends ToolDefinition {
   category: ToolCategory;
   outputSchema?: JSONSchema;
+  sampleInput?: Record<string, unknown>;
+  sampleOutput?: unknown;
 }
 
 export interface ClassifiedToolSource {
