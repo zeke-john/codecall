@@ -135,6 +135,6 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-/generated
-/PLAN.md
-/SIA.md
+/SANDBOX_ARCHITECTURE.md
+/TOOL_REGISTRY.md
+/generatedSdks/tools/todoist

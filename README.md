@@ -6,11 +6,10 @@ Codecall changes how agents interact with tools by letting them **write and exec
 
 Works with **MCP servers** and **standard tool definitions**.
 
-> [!NOTE] > **Before reading** :)
+> [!NOTE]
+> **Before reading** :)
 >
 > Please keep in mind all of this is the **future plan** for Codecall and how it will work. Codecall is still a WIP and not production ready.
->
-> The README describes the vision and architecture for how the system will function once completed and worked on. Features, API design, and implementation details are subject to change.
 >
 > If you're interested in contributing or following the project, check back soon or open an issue to discuss ideas!
 
@@ -214,29 +213,39 @@ executeCode(`
 Success returns:
 
 ```typescript
-    {
-      status: "success",
-      output: [
-        { id: "1", name: "Alice", role: "admin", ... },
-        { id: "2", name: "Bob", role: "admin", ... }
-      ]
-    }
-
+{
+  status: "success",
+  output: [
+    { id: "1", name: "Alice", role: "admin", ... },
+    { id: "2", name: "Bob", role: "admin", ... }
+  ],
+  progressLogs: [{ step: "Loading users..." }]
+}
 ```
 
 Error returns:
 
 ```typescript
-	{
-	  status: "error",
-	  error: "ToolError: revokeAccess expected object { userId: string, resourceId: string }, got (string, string)",
-	  executionTrace: [
-	    { step: 1, function: "listAllUsers", input: {}, output: [...] },
-	    { step: 2, function: "revokeAccess", input: ["admin-1", "resource-db-prod"], error: "Invalid Argument Schema" }
-	  ],
-	  failedCode: "const result = await tools.permissions.revokeAccess(admin.id, resource.id);"
-	}
+{
+  status: "error",
+  error: `=== ERROR ===
+Type: Error
+Message: Undefined value at 'result[0]'. This usually means you accessed a property that doesn't exist.
+
+=== STACK TRACE ===
+Error: Undefined value at 'result[0]'...
+    at validateResult (file:///.../sandbox.ts:68:11)
+    at file:///.../sandbox.ts:99:5
+
+=== CODE THAT FAILED ===
+    1 |     const users = await tools.users.listAllUsers();
+    2 |     const names = users.map(u => u.nmae);
+    3 |     return names;`,
+  progressLogs: [{ step: "Loading users..." }]
+}
 ```
+
+The error includes the full stack trace and the numbered user code, giving the model maximum context to fix the issue.
 
 ### Code Execution & Sandboxing
 
@@ -257,8 +266,8 @@ By default, the sandboxed code has no access to the filesystem, network, environ
 │        ▼               ▼               ▼               ▼               ▼                │
 │   Fresh Deno      tools proxy     Run generated    Collect return   Terminate           │
 │   process with    + progress()    TypeScript       value or error   process,            │
-│   deny-all        injected        code             + exec trace     cleanup             │
-│   permissions                                                                           │
+│   deny-by-default injected        code             + progress logs  cleanup             │
+│   (Deno 2)                                                                              │
 │                                                                                         │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -303,10 +312,12 @@ By default, the sandboxed code has no access to the filesystem, network, environ
 
 ### How Tool Calls Work at Runtime
 
-When the generated code runs, Codecall injects a real `tools` object into the sandbox.
+When the generated code runs, Codecall injects a `tools` Proxy into the sandbox.
 
-- `tools` is not a set of local functions, but it's a small runtime bridge provided by Codecall
-- Each call to `tools.*` is forwarded to the real tool implementation
+- `tools` is not a set of local functions, but a Proxy that intercepts all property access
+- Each call like `tools.namespace.method(args)` sends a JSON message via IPC to the host
+- The host's `ToolRegistry` routes the call to the correct handler (MCP server or internal function)
+- Results are sent back via IPC, and the Promise resolves in the sandbox
 
 So when the the model calls `executeCode()` w/ tools:
 
@@ -320,15 +331,15 @@ const result = await tools.permissions.revokeAccess({
 
 What actually happens is:
 
-- The sandbox captures the tool name (`"permissions.revokeAccess"`) and arguments
-- Codecall forwards that request to the connected MCP server using `tools/call`
-- The MCP server executes the real tool
-- The result is returned back to the sandbox
-- The script continues running
+- The sandbox's `tools` Proxy intercepts the call and sends a JSON message to stdout: `{ type: "call", tool: "permissions.revokeAccess", args: {...} }`
+- The host process (Node.js) receives this via IPC and routes it through the `ToolRegistry`
+- The `ToolRegistry` looks up the handler (MCP connection or internal function) and executes it
+- The result is sent back to the sandbox via stdin: `{ id: 1, result: {...} }`
+- The sandbox resolves the Promise and code continues running
 
-From the code’s perspective this behaves exactly like calling a normal async function.
+From the code's perspective this behaves exactly like calling a normal async function.
 
-## Progress Updates (v2)
+## Progress Updates
 
 The model can use `progress()` when writing code to provide real time feedback during long-running operations. While the model could also achieve progress by making multiple smaller `executeCode()` calls, using `progress()` within a single execution is more efficient, gives better context, and reduces the number of steps too.
 
