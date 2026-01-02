@@ -4,7 +4,7 @@ dotenv.config();
 import * as fs from "fs";
 import * as path from "path";
 import { MCPServerConfig } from "../src/mcp/mcpClient";
-import { generateVirtualSDKFromMCP } from "../src/sdk/generator";
+import { generateSDKFromMCP } from "../src/sdk/generator";
 
 async function readGeneratedFile(filePath: string, baseDir = "generatedSdks") {
   const fullPath = path.resolve(baseDir, filePath);
@@ -39,7 +39,7 @@ async function main() {
       "  --skip-discovery  Skip output schema discovery (faster, but no output types)"
     );
     console.log(
-      "  --output <dir>    Write SDK files to disk (default: generatedSdks)"
+      "  --output <dir>    Output directory for SDK files (default: generatedSdks)"
     );
     console.log(
       "  --base <dir>      Base directory for read mode (default: generatedSdks)"
@@ -61,9 +61,10 @@ async function main() {
     await readGeneratedFile(filePath, baseDir);
     return;
   }
+
   let config: MCPServerConfig;
   let skipDiscovery = false;
-  let outputDir: string | undefined;
+  let outputDir = "generatedSdks";
 
   if (mode === "http") {
     config = { type: "http", url: args[1] };
@@ -111,42 +112,35 @@ async function main() {
 
   console.log("Connecting to MCP server...");
   console.log(`Skip discovery: ${skipDiscovery}`);
-  if (outputDir) {
-    console.log(`Output directory: ${outputDir}`);
-  }
+  console.log(`Output directory: ${outputDir}`);
 
-  const { vfs, errors } = await generateVirtualSDKFromMCP(config, {
+  const result = await generateSDKFromMCP(config, {
     skipOutputDiscovery: skipDiscovery,
+    outputDir,
   });
 
-  if (errors.length > 0) {
+  if (result.errors.length > 0) {
     console.log("\nDiscovery errors:");
-    for (const error of errors) {
+    for (const error of result.errors) {
       console.log(`  - ${error.toolName}: ${error.error}`);
     }
   }
 
-  console.log("\nGenerated files:");
-  console.log(vfs.getTree());
-
-  if (outputDir) {
-    const fullOutputPath = path.resolve(outputDir);
-    await vfs.writeToDisk(fullOutputPath);
-    console.log(`\nFiles written to: ${fullOutputPath}`);
-  } else {
-    const allPaths = vfs.getAllPaths();
-    for (const filePath of allPaths) {
-      console.log(`\n--- ${filePath} ---`);
-      console.log(vfs.get(filePath));
-    }
+  console.log(`\nGenerated SDK: ${result.folderName}`);
+  console.log("Files written:");
+  for (const file of result.files) {
+    console.log(`  ${file}`);
   }
+  console.log(`\nOutput: ${path.resolve(outputDir)}`);
 }
 
 main().catch(console.error);
 
-// npm run test:mcp -- stdio npx @doist/todoist-ai --env TODOIST_API_KEY=xxx --output generatedSdks
-// npm run test:mcp -- stdio npx @brightdata/mcp --env API_TOKEN=xxx --output generatedSdks
-//npm run test:mcp -- stdio npx @playwright/mcp@latest --output generatedSdks
+// npm run test:mcp -- stdio npx @doist/todoist-ai --output generatedSdks
+// npm run test:mcp -- stdio npx @brightdata/mcp --output generatedSdks
+// npm run test:mcp -- stdio npx @playwright/mcp@latest --output generatedSdks
+//npm run test:mcp -- stdio docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server --env GITHUB_PERSONAL_ACCESS_TOKEN=xxx --output generatedSdks
+
 // --skip-discovery
 
-// npm run test:mcp -- read tools/bright_data/searchEngine.ts
+// npm run test:mcp -- read tools/brightData/searchEngine.ts

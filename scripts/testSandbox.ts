@@ -10,6 +10,7 @@ async function main() {
     console.log("test for todoist mcp, rm this if your not using this");
     return;
   }
+
   const registry = new ToolRegistry();
   const sandbox = new Sandbox(registry);
 

@@ -1,4 +1,3 @@
-export { VirtualFileSystem } from "./types/sdk";
 export {
   ToolDefinition,
   ToolSource,
@@ -18,5 +17,11 @@ export {
 } from "./mcp/mcpClient";
 export { ToolRegistry } from "./core/toolRegistry";
 export { Sandbox, ExecutionResult, ExecuteOptions } from "./core/sandbox";
-export { generateSDK, generateVirtualSDK } from "./sdk/generator";
+export {
+  generateSDK,
+  generateSDKFromMCP,
+  generateSDKFromSources,
+  GenerateOptions,
+  GenerateResult,
+} from "./sdk/generator";
 export { generateSDKFromLLM, callOpenRouter } from "./llm/modelClient";

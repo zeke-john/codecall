@@ -1,9 +1,6 @@
-import {
-  ToolSource,
-  GeneratedSDK,
-  VirtualFileSystem,
-  ClassifiedToolSource,
-} from "../types";
+import * as fs from "fs";
+import * as path from "path";
+import { ToolSource, GeneratedSDK, ClassifiedToolSource } from "../types";
 import {
   generateSDKFromLLM,
   generateSDKFromClassifiedSource,
@@ -21,57 +18,77 @@ export async function generateSDKWithDiscovery(
   return generateSDKFromClassifiedSource(source);
 }
 
-export async function generateVirtualSDK(
-  sources: ToolSource[]
-): Promise<VirtualFileSystem> {
-  const vfs = new VirtualFileSystem();
-  for (const source of sources) {
-    const sdk = await generateSDK(source);
-    for (const file of sdk.files) {
-      const path = `tools/${sdk.folderName}/${file.fileName}`;
-      vfs.set(path, file.content);
-    }
+async function writeSDKToDisk(
+  sdk: GeneratedSDK,
+  outputDir: string
+): Promise<string[]> {
+  const writtenPaths: string[] = [];
+
+  for (const file of sdk.files) {
+    const filePath = `tools/${sdk.folderName}/${file.fileName}`;
+    const fullPath = path.join(outputDir, filePath);
+    const dir = path.dirname(fullPath);
+
+    await fs.promises.mkdir(dir, { recursive: true });
+    await fs.promises.writeFile(fullPath, file.content, "utf-8");
+    writtenPaths.push(filePath);
   }
 
-  return vfs;
+  return writtenPaths;
 }
 
-export interface DiscoveryOptions {
+export interface GenerateOptions {
   skipOutputDiscovery?: boolean;
+  outputDir: string;
 }
 
-export async function generateVirtualSDKFromMCP(
-  config: MCPServerConfig,
-  options: DiscoveryOptions = {}
-): Promise<{
-  vfs: VirtualFileSystem;
+export interface GenerateResult {
+  folderName: string;
+  files: string[];
   errors: Array<{ toolName: string; error: string }>;
-}> {
+}
+
+export async function generateSDKFromMCP(
+  config: MCPServerConfig,
+  options: GenerateOptions
+): Promise<GenerateResult> {
   const connection = await MCPConnection.connect(config);
-  const vfs = new VirtualFileSystem();
   let errors: Array<{ toolName: string; error: string }> = [];
+  let sdk: GeneratedSDK;
 
   try {
     if (options.skipOutputDiscovery) {
       const source = connection.getToolSource();
-      const sdk = await generateSDK(source);
-      for (const file of sdk.files) {
-        const path = `tools/${sdk.folderName}/${file.fileName}`;
-        vfs.set(path, file.content);
-      }
+      sdk = await generateSDK(source);
     } else {
       const result = await discoverOutputSchemas(connection);
       errors = result.errors;
-
-      const sdk = await generateSDKWithDiscovery(result.classifiedSource);
-      for (const file of sdk.files) {
-        const path = `tools/${sdk.folderName}/${file.fileName}`;
-        vfs.set(path, file.content);
-      }
+      sdk = await generateSDKWithDiscovery(result.classifiedSource);
     }
+
+    const files = await writeSDKToDisk(sdk, options.outputDir);
+
+    return {
+      folderName: sdk.folderName,
+      files,
+      errors,
+    };
   } finally {
     await connection.close();
   }
+}
 
-  return { vfs, errors };
+export async function generateSDKFromSources(
+  sources: ToolSource[],
+  outputDir: string
+): Promise<string[]> {
+  const allPaths: string[] = [];
+
+  for (const source of sources) {
+    const sdk = await generateSDK(source);
+    const paths = await writeSDKToDisk(sdk, outputDir);
+    allPaths.push(...paths);
+  }
+
+  return allPaths;
 }

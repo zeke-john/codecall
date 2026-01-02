@@ -22,10 +22,10 @@ Traditional tool calling has fundamental architectural issues that get worse at 
 Every tool definition lives in your system prompt. Connect a few MCP servers and you're burning tens of thousands of tokens before the conversation even starts.
 
 ```
-GitHub MCP:        32 tools  →  ~60,000 tokens
+GitHub MCP:        22 tools  →  ~44,000 tokens
 Internal Tools:    12 tools  →  ~24,000 tokens
 ───────────────────────────────────────────────
-Total:             44 tools  →  ~84,000 tokens (before any work happens)
+Total:             34 tools  →  ~68,000 tokens (before any work happens)
 ```
 
 ### 2. Inference Overhead
