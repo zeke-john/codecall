@@ -531,9 +531,36 @@ Because Codecall focuses on deterministic, type-safe code generation, its benefi
 
 ## Roadmap
 
-WIP, Please check back soon or feel free to add here :)
+- [x] **MCP Client** - connect to MCP servers via stdio/HTTP
+- [x] **Tool Registry** - unified routing for MCP + internal tools
+- [x] **Deno Sandbox** - isolated TypeScript execution with IPC bridge
+- [x] **Tools Proxy** - intercept `tools.namespace.method()` calls in the deno sandbox
+- [x] **Progress Streaming** - the Real time `onProgress` callback support is working
+- [x] **Handling Errors** - the entire stack traces + numbered code on failure returns on error
+- [x] **Result Validation** - Catch undefined values (property access errors) similar to the above
 
-Still working on how the high level architecture and how everything should work/flow together
+### SDK Generation
+
+ASS rn, need to make it CONSISTENT
+
+- [x] **SDK generator** - Convert MCP definitions to TypeScript SDK files
+- [x] **Classifying tools** - Classify tools as read/write/destructive
+- [x] **Schema inference** - get the output types from tool responses and infer from there
+- [ ] **Output schema discovery** - Sample tools to discover return types
+- [ ] **Retrying w/ errors** - If it fails when the llm inject data for a tool, keep retrying until it gets it right (or let the user know so they can update it manually)
+
+### Agent
+
+- [ ] **Add internal tools** - Expose `listFiles`, `readFile`, `executeCode` to LLM
+- [ ] **Normal agent loop** - handle LLM messages and tool calls w/ streaming, just a normal agent loop (reference jubby)
+- [ ] **System prompt** - guide the LLM to explore SDK files, write code and etc
+- [ ] **Handling strings 🙃** - If a tool outputs a string, let the model know that and write code up to that point and just return that if its using that
+
+### More stuff
+
+- [ ] **Head 2 Head** - Using the same exact set of tools and a task, do a direct head to head w/ code call and a traditional agent
+- [ ] **Documentation** - docs and usage examples
+- [ ] **NPM Package** - an npm package for codecall
 
 ## Contributing
 
