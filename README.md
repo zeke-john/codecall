@@ -249,24 +249,22 @@ The error includes the full stack trace and the numbered user code, giving the m
 
 ### Code Execution & Sandboxing
 
-When the model calls `executeCode()`, Codecall runs that code inside a fresh, short-lived Deno sandbox. Each sandbox. Each sandbox is spun up using Deno and runs the code in isolation. Deno’s security model blocks access to sensitive capabilities unless explicitly allowed.
+When the model calls `executeCode()`, Codecall runs that code inside a fresh, short-lived Deno sandbox. Each sandbox is spun up using Deno and runs the code in isolation. Deno’s security model blocks access to sensitive capabilities unless explicitly allowed.
 
 By default, the sandboxed code has no access to the filesystem, network, environment variables, or system processes. The only way it can interact with the outside world is by calling the tool functions exposed through tools (which are forwarded by Codecall to the MCP server).
 
-#### Sandbox Lifecycle (Deno isolates)
+#### Sandbox Lifecycle
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                              SANDBOX LIFECYCLE                                          │
-│                                                                                         │
-│   ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐           │
-│   │  SPAWN  │────▶│  INJECT │────▶│ EXECUTE │────▶│ CAPTURE │────▶│ DESTROY │           │
-│   └─────────┘     └─────────┘     └─────────┘     └─────────┘     └─────────┘           │
-│        │               │               │               │               │                │
-│        ▼               ▼               ▼               ▼               ▼                │
-│   Fresh Deno      tools proxy     Run generated    Collect return   Terminate           │
-│   process with    + progress()    TypeScript       value or error   process,            │
-│   deny-by-default injected        code             + progress logs  cleanup             │
+│   ┌─────────┐       ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐         │
+│   │  SPAWN  │────--▶│  INJECT │────▶│ EXECUTE │────▶│ CAPTURE │────▶│ DESTROY │         │
+│   └─────────┘       └─────────┘     └─────────┘     └─────────┘     └─────────┘         │
+│        │                 │               │               │               │              │
+│        ▼                 ▼               ▼               ▼               ▼              │
+│   Fresh Deno       tools proxy     Run generated    Collect return   Terminate          │
+│   process with     + progress()    TypeScript       value or error   process,           │
+│   deny-by-default  injected        code             + progress logs  cleanup            │
 │   (Deno 2)                                                                              │
 │                                                                                         │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
@@ -276,8 +274,6 @@ By default, the sandboxed code has no access to the filesystem, network, environ
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                                  DATA FLOW                                              │
-│                                                                                         │
 │                                                                                         │
 │    SANDBOX                        TOOL BRIDGE                         MCP SERVER        │
 │       │                               │                                    │            │
@@ -344,7 +340,7 @@ From the code's perspective this behaves exactly like calling a normal async fun
 The model can use `progress()` when writing code to provide real time feedback during long-running operations. While the model could also achieve progress by making multiple smaller `executeCode()` calls, using `progress()` within a single execution is more efficient, gives better context, and reduces the number of steps too.
 
 Because Codecall's main benefit comes from executing comprehensive code in a single pass,
-progress updates are important for two reasons:
+progress updates are important for two main reasons:
 
 1. **Better UX**: Users see real-time feedback during long-running operations without multiple model calls adding cost and latency
 
