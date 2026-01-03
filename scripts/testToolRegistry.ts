@@ -39,8 +39,8 @@ async function main() {
   registry.registerMCP("todoist", connection);
   console.log("tools ->", registry.getRegisteredPaths());
 
-  const overview = await registry.call("todoist.user-info", {});
-  console.log("todoist.get-overview:", overview);
+  const userInfo = await registry.call("todoist.userInfo", {});
+  console.log("todoist.userInfo:", userInfo);
 
   await connection.close();
 }

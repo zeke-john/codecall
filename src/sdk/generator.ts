@@ -1,21 +1,11 @@
 import * as fs from "fs";
 import * as path from "path";
-import { ToolSource, GeneratedSDK, ClassifiedToolSource } from "../types";
-import {
-  generateSDKFromLLM,
-  generateSDKFromClassifiedSource,
-} from "../llm/modelClient";
+import { ToolSource, GeneratedSDK } from "../types";
+import { generateSDKFromLLM } from "../llm/modelClient";
 import { MCPConnection, MCPServerConfig } from "../mcp/mcpClient";
-import { discoverOutputSchemas } from "./outputSchemaDiscoverer";
 
 export async function generateSDK(source: ToolSource): Promise<GeneratedSDK> {
   return generateSDKFromLLM(source);
-}
-
-export async function generateSDKWithDiscovery(
-  source: ClassifiedToolSource
-): Promise<GeneratedSDK> {
-  return generateSDKFromClassifiedSource(source);
 }
 
 async function writeSDKToDisk(
@@ -38,14 +28,15 @@ async function writeSDKToDisk(
 }
 
 export interface GenerateOptions {
-  skipOutputDiscovery?: boolean;
   outputDir: string;
 }
 
 export interface GenerateResult {
   folderName: string;
   files: string[];
-  errors: Array<{ toolName: string; error: string }>;
+  toolsMissingOutputSchema: string[];
+  toolsWithOutputSchema: string[];
+  totalTools: number;
 }
 
 export async function generateSDKFromMCP(
@@ -53,25 +44,26 @@ export async function generateSDKFromMCP(
   options: GenerateOptions
 ): Promise<GenerateResult> {
   const connection = await MCPConnection.connect(config);
-  let errors: Array<{ toolName: string; error: string }> = [];
-  let sdk: GeneratedSDK;
 
   try {
-    if (options.skipOutputDiscovery) {
-      const source = connection.getToolSource();
-      sdk = await generateSDK(source);
-    } else {
-      const result = await discoverOutputSchemas(connection);
-      errors = result.errors;
-      sdk = await generateSDKWithDiscovery(result.classifiedSource);
-    }
-
+    const source = connection.getToolSource();
+    const sdk = await generateSDK(source);
     const files = await writeSDKToDisk(sdk, options.outputDir);
+
+    const toolsMissingOutputSchema = source.tools
+      .filter((tool) => !tool.outputSchema)
+      .map((tool) => tool.name);
+
+    const toolsWithOutputSchema = source.tools
+      .filter((tool) => tool.outputSchema)
+      .map((tool) => tool.name);
 
     return {
       folderName: sdk.folderName,
       files,
-      errors,
+      toolsMissingOutputSchema,
+      toolsWithOutputSchema,
+      totalTools: source.tools.length,
     };
   } finally {
     await connection.close();
@@ -81,14 +73,39 @@ export async function generateSDKFromMCP(
 export async function generateSDKFromSources(
   sources: ToolSource[],
   outputDir: string
-): Promise<string[]> {
+): Promise<{
+  files: string[];
+  toolsMissingOutputSchema: string[];
+  toolsWithOutputSchema: string[];
+  totalTools: number;
+}> {
   const allPaths: string[] = [];
+  const allMissing: string[] = [];
+  const allWithSchema: string[] = [];
+  let total = 0;
 
   for (const source of sources) {
     const sdk = await generateSDK(source);
     const paths = await writeSDKToDisk(sdk, outputDir);
     allPaths.push(...paths);
+
+    const missing = source.tools
+      .filter((tool) => !tool.outputSchema)
+      .map((tool) => tool.name);
+    allMissing.push(...missing);
+
+    const withSchema = source.tools
+      .filter((tool) => tool.outputSchema)
+      .map((tool) => tool.name);
+    allWithSchema.push(...withSchema);
+
+    total += source.tools.length;
   }
 
-  return allPaths;
+  return {
+    files: allPaths,
+    toolsMissingOutputSchema: allMissing,
+    toolsWithOutputSchema: allWithSchema,
+    totalTools: total,
+  };
 }

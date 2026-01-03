@@ -1,4 +1,4 @@
-import { ToolSource, GeneratedSDK, ClassifiedToolSource } from "../types";
+import { ToolSource, GeneratedSDK } from "../types";
 
 interface OpenRouterMessage {
   role: "system" | "user" | "assistant";
@@ -51,76 +51,7 @@ export async function callOpenRouter(
   return content;
 }
 
-export async function generateSDKFromLLM(
-  source: ToolSource
-): Promise<GeneratedSDK> {
-  const systemPrompt = `You are a TypeScript SDK generator. Given raw MCP tool definitions, generate clean, well-typed SDK files.
-
-These SDK files are read by an LLM to understand available tools. The LLM writes executable code using ONLY this pattern:
-  await tools.{folderName}.{functionName}(input)
-
-This is the ONLY way to call these functions at runtime. The function declarations below are for type reference only.
-
-RULES:
-1. EVERY file must start with a header comment block showing the exact call pattern:
-   /**
-    * HOW TO CALL THIS TOOL:
-    * await tools.{folderName}.{functionName}({ ...params })
-    *
-    * This is the ONLY way to invoke this tool in your code.
-    */
-
-2. Extract ALL information from the tool definition
-3. Convert JSON Schema types to TypeScript (string, number, boolean, arrays, objects)
-4. Use union types for enums (e.g., priority: 1 | 2 | 3 | 4)
-5. Mark optional fields with ? based on the "required" array
-6. Add JSDoc comments from descriptions
-7. Use camelCase for function/file names, PascalCase for interfaces
-8. Each file should have an Input interface and an async function DECLARATION (no body)
-9. The function should be a declaration ending with semicolon: export async function name(input: Input): Promise<Output>;
-
-Return ONLY valid JSON with no markdown formatting, no code blocks, just raw JSON:
-{
-  "folderName": "short_clean_name_for_folder",
-  "files": [
-    { "fileName": "toolName.ts", "content": "full typescript file content with proper formatting and newlines" }
-  ]
-}`;
-
-  const userPrompt = `Source Name: "${source.name}"
-Version: ${source.version || "unknown"}
-
-Tool Definitions:
-${JSON.stringify(source.tools, null, 2)}
-
-Generate the SDK files. Remember to return ONLY valid JSON, no markdown.`;
-
-  const content = await callOpenRouter([
-    { role: "system", content: systemPrompt },
-    { role: "user", content: userPrompt },
-  ]);
-
-  const cleanedContent = content
-    .replace(/```json\n?/g, "")
-    .replace(/```\n?/g, "")
-    .trim();
-
-  try {
-    const parsed = JSON.parse(cleanedContent) as GeneratedSDK;
-
-    if (!parsed.folderName || !Array.isArray(parsed.files)) {
-      throw new Error("Invalid SDK structure from LLM");
-    }
-
-    return parsed;
-  } catch (error) {
-    console.error("Failed to parse LLM response:", cleanedContent);
-    throw new Error(`Failed to parse LLM response as JSON: ${error}`);
-  }
-}
-
-const CLASSIFIED_SDK_SYSTEM_PROMPT = `
-You are a TypeScript SDK generator. Given MCP tool definitions with their classifications, output schemas, and real examples, generate clean, well-typed SDK files.
+const SDK_SYSTEM_PROMPT = `You are a TypeScript SDK generator. Given tool definitions, generate clean, well-typed SDK files.
 
 These SDK files are read by an LLM to understand available tools. The LLM writes executable code using ONLY this pattern:
   await tools.{folderName}.{functionName}(input)
@@ -140,18 +71,14 @@ RULES:
 3. Convert JSON Schema types to TypeScript (string, number, boolean, arrays, objects)
 4. Use union types for enums (e.g., priority: 1 | 2 | 3 | 4)
 5. Mark optional fields with ? based on the "required" array
-6. Use camelCase for function/file names, PascalCase for interfaces
-7. Each file should have Input interface, Output interface (when available), and an async function DECLARATION (no body)
-8. The function should be a declaration ending with semicolon, NOT an implementation: export async function name(input: Input): Promise<Output>;
-9. When outputSchema is provided, create an Output interface and type the function return as Promise<Output>
-10. For tools with category "read" or "write_read", the output type is critical - use the exact outputSchema structure
-11. For tools with category "write" or "destructive", the return type can be Promise<void> or a simple success type
-12. When sampleInput and sampleOutput are provided, include them as a clearly labeled comment block BEFORE the function
-13. Format the examples as a multi-line comment with "INPUT EXAMPLE:" and "OUTPUT EXAMPLE:" labels so they are not confused
-14. Pretty-print the JSON examples for readability (2-space indent)
-15. Truncate very large output examples to first few items if the array is long (show first 2-3 items then add "// ... more items")
+6. Add JSDoc comments from descriptions
+7. Use camelCase for function/file names, PascalCase for interfaces
+8. Each file should have an Input interface and an async function DECLARATION (no body)
+9. The function should be a declaration ending with semicolon: export async function name(input: Input): Promise<Output>;
 
-IMPORTANT: Do NOT include any function body or call() - just the function declaration signature.
+OUTPUT SCHEMA HANDLING:
+- When outputSchema IS provided: Create an Output interface from the schema and type the function return as Promise<Output>
+- When outputSchema is NOT provided: Use Promise<unknown> as the return type
 
 Return ONLY valid JSON with no markdown formatting, no code blocks, just raw JSON:
 {
@@ -161,31 +88,28 @@ Return ONLY valid JSON with no markdown formatting, no code blocks, just raw JSO
   ]
 }`;
 
-export async function generateSDKFromClassifiedSource(
-  source: ClassifiedToolSource
+export async function generateSDKFromLLM(
+  source: ToolSource
 ): Promise<GeneratedSDK> {
-  const toolsWithSchemas = source.tools.map((tool) => ({
+  const toolsForPrompt = source.tools.map((tool) => ({
     name: tool.name,
     description: tool.description,
-    category: tool.category,
     inputSchema: tool.inputSchema,
     outputSchema: tool.outputSchema,
-    sampleInput: tool.sampleInput,
-    sampleOutput: tool.sampleOutput,
   }));
 
   const userPrompt = `Source Name: "${source.name}"
 Version: ${source.version || "unknown"}
 
-Tool Definitions (with classifications, output schemas, and real examples from API calls):
-${JSON.stringify(toolsWithSchemas, null, 2)}
+Tool Definitions:
+${JSON.stringify(toolsForPrompt, null, 2)}
 
 Generate the SDK files. For tools with outputSchema, create properly typed Output interfaces.
-For tools with sampleInput and sampleOutput, include them as clearly labeled comment blocks (INPUT EXAMPLE / OUTPUT EXAMPLE) before the function.
+For tools WITHOUT outputSchema, use Promise<unknown> as the return type.
 Remember to return ONLY valid JSON, no markdown.`;
 
   const content = await callOpenRouter([
-    { role: "system", content: CLASSIFIED_SDK_SYSTEM_PROMPT },
+    { role: "system", content: SDK_SYSTEM_PROMPT },
     { role: "user", content: userPrompt },
   ]);
 

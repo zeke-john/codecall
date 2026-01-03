@@ -37,6 +37,11 @@ async function main() {
     });
     progress({ step: 5, message: "Task created" });
 
+    progress({ step: 6, message: "Finding tasks" });
+
+    const allTasks = await tools.todoist.findTasks({ searchText: "trending" });
+    progress({ step: 7, message: "Found tasks" });
+
     return { titles, newTask };
   `,
     {

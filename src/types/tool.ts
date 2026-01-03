@@ -28,21 +28,7 @@ export interface ToolDefinition {
   name: string;
   description?: string;
   inputSchema: JSONSchema;
-}
-
-export type ToolCategory = "read" | "write" | "destructive" | "write_read";
-
-export interface ClassifiedTool extends ToolDefinition {
-  category: ToolCategory;
   outputSchema?: JSONSchema;
-  sampleInput?: Record<string, unknown>;
-  sampleOutput?: unknown;
-}
-
-export interface ClassifiedToolSource {
-  name: string;
-  version?: string;
-  tools: ClassifiedTool[];
 }
 
 export interface ToolSource {

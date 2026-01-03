@@ -6,8 +6,7 @@ Codecall changes how agents interact with tools by letting them **write and exec
 
 Works with **MCP servers** and **standard tool definitions**.
 
-> [!NOTE]
-> **Before reading** :)
+> [!NOTE] > **Before reading** :)
 >
 > Please keep in mind all of this is the **future plan** for Codecall and how it will work. Codecall is still a WIP and not production ready.
 >
@@ -471,63 +470,9 @@ TypeScript also gives you:
 
 ## Main Challenges
 
-### Output Schemas from Tools
+Please reference [`docs/CHALLENGES.md`](https://github.com/codecalll/blob/main/docs/CHALLENGES.md) for the codecall's main 3 challenges
 
-MCP tool definitions include `inputSchema` (what you pass to a tool) but `outputSchema` is **optional** and most servers almost never provide it... This matters Codecall generates TypeScript code that chains tool calls together. Without knowing what a tool returns, the model has to guess the structure, leading to runtime errors.
-
-**Example of the problem:**
-
-```typescript
-const tasks = await tools.todoist.getTasks({ filter: "today" });
-
-for (const task of tasks) {
-  console.log(task.title);  // BUG: actual property is "name", not "title"
-}
-
-if (task.dueDate === "2024-01-15") { ... }
-// BUG: actual structure is task.due, not task.dueDate
-```
-
-The code looks correct but fails at runtime because the model hallucinated the return type based on common naming patterns...
-
-#### Our Workaround
-
-We haven't fully solved this (that would require MCP servers to provide `outputSchema`), but we've implemented a hack that works in practice:
-
-1. **Tool Classification** - We use an LLM to classify each tool as `read`, `write`, `destructive`, or `write_read` based on its semantics
-2. **Output Schema Discovery** - For tools classified as `read` or `write_read`, we generate safe sample inputs and actually call the tool
-3. **Schema Inference** - We capture the real response and infer a JSON schema from it
-4. **Typed SDK Generation** - The inferred schema is passed to the SDK generator, producing proper TypeScript output types
-
-This means tools like `search_engine` now generate SDKs with accurate output types based on real API responses, not guesses.
-
-**Limitations:**
-
-- Requires actually calling the tools during SDK generation
-- Single sample responses may miss optional fields or variant shapes
-- Write+Read tools create real data (we use identifiable test names like `codecall_test_*`)
-
-### Tool Outputs Are Often Plain Strings
-
-A second more fundamental challenge is that a lot of MCP servers return plain strings or markdown, not structured data...
-
-In these cases:
-
-- The output has no stable shape
-- There are no fields to index into
-- There is nothing meaningful to type beyond string
-
-From Codecall’s perspective, this means:
-
-- No reliable code generation beyond simple passthrough
-- No safe composition of tool outputs
-- No advantage over a traditional agent that directly interprets text
-
-This is not a limitation of Codecall, but a reflection of how the tools were designed.
-
-Because Codecall focuses on deterministic, type-safe code generation, its benefits disappear when tool outputs are unstructured. In those cases, interpretation must happen in the LLM itself, which moves the system back into standard agent behavior.
-
-**Sadly, there is no reliable workaround when using external MCP servers: if you do not control the tool, you cannot enforce structured outputs.**
+Link to Hacker News post describing these -> https://news.ycombinator.com/item?id=46473471
 
 ## Roadmap
 
@@ -541,13 +486,7 @@ Because Codecall focuses on deterministic, type-safe code generation, its benefi
 
 ### SDK Generation
 
-ASS rn, need to make it CONSISTENT
-
-- [x] **SDK generator** - Convert MCP definitions to TypeScript SDK files
-- [x] **Classifying tools** - Classify tools as read/write/destructive
-- [x] **Schema inference** - get the output types from tool responses and infer from there
-- [ ] **Output schema discovery** - Sample tools to discover return types
-- [ ] **Retrying w/ errors** - If it fails when the llm inject data for a tool, keep retrying until it gets it right (or let the user know so they can update it manually)
+WIP
 
 ### Agent
 

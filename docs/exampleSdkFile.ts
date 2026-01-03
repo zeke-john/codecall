@@ -1,3 +1,5 @@
+// THIS IS AN EXAMPLE OF AN SDK FILE FOR A SEARCH TOOL
+
 /**
  * HOW TO CALL THIS TOOL:
  * await tools.todoistMcpServer.search({ ...params })
@@ -24,6 +26,8 @@ export interface SearchOutput {
  * {
  *   "query": "test"
  * }
+ *
+ * -----------------------------
  *
  * OUTPUT EXAMPLE:
  * {
