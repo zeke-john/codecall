@@ -161,7 +161,9 @@ async function main() {
   console.log(
     "Please see a full example in docs/exampleSdkFile.ts for how a SDK file should look -> "
   );
-  console.log("https://github.com/codecalll/blob/main/docs/exampleSdkFile.ts");
+  console.log(
+    "https://github.com/zeke-john/codecall/blob/main/docs/exampleSdkFile.ts"
+  );
 }
 
 main().catch(console.error);

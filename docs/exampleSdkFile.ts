@@ -27,7 +27,7 @@ export interface SearchOutput {
  *   "query": "test"
  * }
  *
- * -----------------------------
+ *
  *
  * OUTPUT EXAMPLE:
  * {

@@ -470,7 +470,7 @@ TypeScript also gives you:
 
 ## Main Challenges
 
-Please reference [`docs/CHALLENGES.md`](https://github.com/codecalll/blob/main/docs/CHALLENGES.md) for the codecall's main 3 challenges
+Please reference [docs/CHALLENGES.md](https://github.com/zeke-john/codecall/blob/main/docs/CHALLENGES.md) for the codecall's main 3 challenges
 
 Link to Hacker News post describing these -> https://news.ycombinator.com/item?id=46473471
 
@@ -493,7 +493,6 @@ WIP
 - [ ] **Add internal tools** - Expose `listFiles`, `readFile`, `executeCode` to LLM
 - [ ] **Normal agent loop** - handle LLM messages and tool calls w/ streaming, just a normal agent loop (reference jubby)
 - [ ] **System prompt** - guide the LLM to explore SDK files, write code and etc
-- [ ] **Handling strings 🙃** - If a tool outputs a string, let the model know that and write code up to that point and just return that if its using that
 
 ### More stuff
 

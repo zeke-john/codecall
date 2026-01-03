@@ -1,6 +1,6 @@
 # Main Challenges
 
-## Output Schemas from Tools
+## 1. Output Schemas from Tools
 
 MCP tool definitions include `inputSchema` (what you pass to a tool) but `outputSchema` is **optional** and most servers almost never provide it... This matters Codecall generates TypeScript code that chains tool calls together. Without knowing what a tool returns, the model has to guess the structure, leading to runtime errors.
 
@@ -19,7 +19,7 @@ if (task.dueDate === "2024-01-15") { ... }
 
 The code looks correct but fails at runtime because the model hallucinated the return type based on common naming patterns...
 
-## Input/Output examples
+## 2. Input/Output examples
 
 **JSON Schema defines structure but not usage patterns.** Take that support ticket API example: the schema tells you `due_date` is a string, but not whether it wants `"2024-11-06"` or `"Nov 6, 2024"`. It says `reporter.id` is a string, but is that a UUID or `"USR-12345"`? When should `reporter.contact` be populated? How do `escalation.level` and `priority` interact? _(example from an anthropic article covering this)_
 
@@ -27,7 +27,7 @@ In traditional tool calling, the model can learn these patterns through **trial 
 
 **This issue is definitely amplified with programmatic tool calling.**
 
-## Tool Outputs Are Often Plain Strings
+## 3. Tool Outputs Are Often Plain Strings
 
 A second more fundamental challenge is that a lot of MCP servers return plain strings or markdown, not structured data...
 
@@ -49,4 +49,6 @@ Because Codecall focuses on deterministic, type-safe code generation, its benefi
 
 **Sadly, there is no reliable workaround when using external MCP servers: if you do not control the tool, you cannot enforce structured outputs.**
 
-## What we've tried
+# What We've Tried (2 & 3)
+
+blah blah
