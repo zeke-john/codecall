@@ -10,7 +10,6 @@ async function main() {
     console.log("test for todoist mcp, rm this if your not using this");
     return;
   }
-
   const registry = new ToolRegistry();
   const sandbox = new Sandbox(registry);
 
@@ -22,14 +21,23 @@ async function main() {
   });
   registry.registerMCP("todoist", connection);
 
+  console.log("all tools:", registry.getRegisteredPaths());
+
   const result = await sandbox.execute(
-    `    
+    `
     progress({ step: 1, message: "Searching tasks..." });
     const tasks = await tools.todoist.search({ query: "task" });
     progress({ step: 2, message: "getting only titles", count: tasks.results.length });
     const titles = tasks.results.map(task => task.title);
     progress({ step: 3, message: "returning titles" });
-    return titles;
+
+    progress({ step: 4, message: "Creating task..." });
+    const newTask = await tools.todoist.addTasks({ 
+      tasks: [{ content: "4:48 pm jan 2" }] 
+    });
+    progress({ step: 5, message: "Task created" });
+
+    return { titles, newTask };
   `,
     {
       onProgress: (data) => {
