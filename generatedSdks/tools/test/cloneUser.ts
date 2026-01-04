@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.demo.cloneUser({ sourceId: 1, newEmail: "cloned@example.com" })
+ * await tools.test.cloneUser({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -9,13 +9,9 @@
  * @readOnly false
  * @destructive false
  * @idempotent false
+ * @openWorld false
+ * @taskSupport forbidden
  */
-
-export interface CloneUserInput {
-  sourceId: number;
-  newEmail: string;
-  newName?: string;
-}
 
 export interface User {
   id?: number;
@@ -28,6 +24,12 @@ export interface User {
   createdAt: string;
 }
 
+export interface CloneUserInput {
+  sourceId: number;
+  newEmail: string;
+  newName?: string;
+}
+
 export interface CloneUserSuccessData {
   clonedUser: User;
   sourceUser: User;
@@ -38,6 +40,4 @@ export type CloneUserOutput = {
   data: CloneUserSuccessData;
 };
 
-export async function cloneUser(
-  input: CloneUserInput
-): Promise<CloneUserOutput>;
+export async function cloneUser(input: CloneUserInput): Promise<CloneUserOutput>;

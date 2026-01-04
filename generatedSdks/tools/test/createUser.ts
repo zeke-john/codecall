@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.demo.createUser({ name: "John Doe", email: "john@example.com", address: "123 Main St", phone: "555-0199" })
+ * await tools.test.createUser({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -9,15 +9,9 @@
  * @readOnly false
  * @destructive false
  * @idempotent false
+ * @openWorld false
+ * @taskSupport forbidden
  */
-
-export interface CreateUserInput {
-  name: string;
-  email: string;
-  address: string;
-  phone: string;
-  favoriteColor?: string;
-}
 
 export interface User {
   id?: number;
@@ -30,6 +24,14 @@ export interface User {
   createdAt: string;
 }
 
+export interface CreateUserInput {
+  name: string;
+  email: string;
+  address: string;
+  phone: string;
+  favoriteColor?: string;
+}
+
 export interface CreateUserSuccessData {
   user: User;
   action: "created";
@@ -40,6 +42,4 @@ export type CreateUserOutput = {
   data: CreateUserSuccessData;
 };
 
-export async function createUser(
-  input: CreateUserInput
-): Promise<CreateUserOutput>;
+export async function createUser(input: CreateUserInput): Promise<CreateUserOutput>;

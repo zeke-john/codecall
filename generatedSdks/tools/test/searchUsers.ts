@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.demo.searchUsers({ query: "John" })
+ * await tools.test.searchUsers({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -9,15 +9,11 @@
  * @readOnly true
  * @destructive false
  * @idempotent true
+ * @openWorld false
+ * @taskSupport forbidden
  */
 
-export interface SearchUsersInput {
-  query: string;
-  /** @default "all" */
-  field?: "name" | "email" | "address" | "phone" | "all";
-  limit?: number;
-  offset?: number;
-}
+export type SearchField = "name" | "email" | "address" | "phone" | "all";
 
 export interface User {
   id?: number;
@@ -28,6 +24,14 @@ export interface User {
   favoriteColor?: string;
   isActive: boolean;
   createdAt: string;
+}
+
+export interface SearchUsersInput {
+  query: string;
+  /** @default "all" */
+  field?: SearchField;
+  limit?: number;
+  offset?: number;
 }
 
 export interface SearchUsersSuccessData {
@@ -43,6 +47,4 @@ export type SearchUsersOutput = {
   data: SearchUsersSuccessData;
 };
 
-export async function searchUsers(
-  input: SearchUsersInput
-): Promise<SearchUsersOutput>;
+export async function searchUsers(input: SearchUsersInput): Promise<SearchUsersOutput>;

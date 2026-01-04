@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.demo.getUsers({})
+ * await tools.test.getUsers({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -9,9 +9,9 @@
  * @readOnly true
  * @destructive false
  * @idempotent true
+ * @openWorld false
+ * @taskSupport forbidden
  */
-
-export interface GetUsersInput {}
 
 export interface User {
   id?: number;
@@ -24,6 +24,8 @@ export interface User {
   createdAt: string;
 }
 
+export interface GetUsersInput {}
+
 export interface GetUsersSuccessData {
   users: User[];
   count: number;
@@ -34,4 +36,4 @@ export type GetUsersOutput = {
   data: GetUsersSuccessData;
 };
 
-export async function getUsers(input: GetUsersInput): Promise<GetUsersOutput>;
+export async function getUsers(input?: GetUsersInput): Promise<GetUsersOutput>;

@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.demo.deactivateUsersByDomain({ domain: "example.com" })
+ * await tools.test.deactivateUsersByDomain({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -9,11 +9,9 @@
  * @readOnly false
  * @destructive false
  * @idempotent true
+ * @openWorld false
+ * @taskSupport forbidden
  */
-
-export interface DeactivateUsersByDomainInput {
-  domain: string;
-}
 
 export interface User {
   id?: number;
@@ -24,6 +22,10 @@ export interface User {
   favoriteColor?: string;
   isActive: boolean;
   createdAt: string;
+}
+
+export interface DeactivateUsersByDomainInput {
+  domain: string;
 }
 
 export interface DeactivateUsersByDomainSuccessData {
@@ -38,6 +40,4 @@ export type DeactivateUsersByDomainOutput = {
   data: DeactivateUsersByDomainSuccessData;
 };
 
-export async function deactivateUsersByDomain(
-  input: DeactivateUsersByDomainInput
-): Promise<DeactivateUsersByDomainOutput>;
+export async function deactivateUsersByDomain(input: DeactivateUsersByDomainInput): Promise<DeactivateUsersByDomainOutput>;

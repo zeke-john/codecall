@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.demo.setUserActiveStatus({ id: 1, isActive: false })
+ * await tools.test.setUserActiveStatus({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -9,12 +9,9 @@
  * @readOnly false
  * @destructive false
  * @idempotent true
+ * @openWorld false
+ * @taskSupport forbidden
  */
-
-export interface SetUserActiveStatusInput {
-  id: number;
-  isActive: boolean;
-}
 
 export interface User {
   id?: number;
@@ -27,9 +24,16 @@ export interface User {
   createdAt: string;
 }
 
+export type UserAction = "activated" | "deactivated";
+
+export interface SetUserActiveStatusInput {
+  id: number;
+  isActive: boolean;
+}
+
 export interface SetUserActiveStatusSuccessData {
   user: User;
-  action: "activated" | "deactivated";
+  action: UserAction;
 }
 
 export type SetUserActiveStatusOutput = {
@@ -37,6 +41,4 @@ export type SetUserActiveStatusOutput = {
   data: SetUserActiveStatusSuccessData;
 };
 
-export async function setUserActiveStatus(
-  input: SetUserActiveStatusInput
-): Promise<SetUserActiveStatusOutput>;
+export async function setUserActiveStatus(input: SetUserActiveStatusInput): Promise<SetUserActiveStatusOutput>;

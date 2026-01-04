@@ -172,6 +172,7 @@ main().catch(console.error);
 // npm run test:mcp -- stdio npx @brightdata/mcp --output generatedSdks
 // npm run test:mcp -- stdio npx @playwright/mcp@latest --output generatedSdks
 // npm run test:mcp -- stdio docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server --env GITHUB_PERSONAL_ACCESS_TOKEN=xxx --output generatedSdks
+// npm run test:mcp -- http http://localhost:4001/mcp --output generatedSdks
 
 // example of reading a generated file ->
 // npm run test:mcp -- read tools/brightData/searchEngine.ts

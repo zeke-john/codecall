@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.demo.getUserById({ id: 1 })
+ * await tools.test.getUserById({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -9,11 +9,9 @@
  * @readOnly true
  * @destructive false
  * @idempotent true
+ * @openWorld false
+ * @taskSupport forbidden
  */
-
-export interface GetUserByIdInput {
-  id: number;
-}
 
 export interface User {
   id?: number;
@@ -26,6 +24,10 @@ export interface User {
   createdAt: string;
 }
 
+export interface GetUserByIdInput {
+  id: number;
+}
+
 export interface GetUserByIdSuccessData {
   user: User;
 }
@@ -35,6 +37,4 @@ export type GetUserByIdOutput = {
   data: GetUserByIdSuccessData;
 };
 
-export async function getUserById(
-  input: GetUserByIdInput
-): Promise<GetUserByIdOutput>;
+export async function getUserById(input: GetUserByIdInput): Promise<GetUserByIdOutput>;

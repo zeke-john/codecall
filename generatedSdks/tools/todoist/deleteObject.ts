@@ -1,20 +1,38 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.todoist.deleteObject({ type: "task", id: "123" })
+ * await tools.todoist.deleteObject({ ...params })
  *
- * @title delete-object
- * @description Delete a project, section, task, or comment by ID.
+ * This is the ONLY way to invoke this tool in your code.
+ *
+ * @title Delete Object
+ * @description Delete a project, section, task, or comment by its ID.
  * @readOnly false
  * @destructive true
+ * @idempotent false
+ * @openWorld false
+ * @taskSupport forbidden
  */
 
+export type EntityType = "project" | "section" | "task" | "comment";
+
 export interface DeleteObjectInput {
-  type: "project" | "section" | "task" | "comment";
+  /** The type of entity to delete. */
+  type: EntityType;
+  /** The ID of the entity to delete. @minLength 1 */
+  id: string;
+}
+
+export interface DeletedEntity {
+  /** The type of deleted entity. */
+  type: EntityType;
+  /** The ID of the deleted entity. */
   id: string;
 }
 
 export interface DeleteObjectOutput {
-  deletedEntity: { type: string; id: string };
+  /** Information about the deleted entity. */
+  deletedEntity: DeletedEntity;
+  /** Whether the deletion was successful. */
   success: boolean;
 }
 

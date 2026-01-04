@@ -1,18 +1,20 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.todoist.completeTasks({ ids: ["123"] })
+ * await tools.todoist.completeTasks({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
- * @title complete-tasks
+ * @title Complete Tasks
  * @description Complete one or more tasks by their IDs.
  * @readOnly false
  * @destructive true
  * @idempotent false
+ * @openWorld false
+ * @taskSupport forbidden
  */
 
 export interface CompleteTasksInput {
-  /** The IDs of the tasks to complete. */
+  /** The IDs of the tasks to complete. @minItems 1 @minLength 1 */
   ids: string[];
 }
 

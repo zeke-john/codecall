@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.demo.getInactiveUsers({})
+ * await tools.test.getInactiveUsers({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -9,9 +9,9 @@
  * @readOnly true
  * @destructive false
  * @idempotent true
+ * @openWorld false
+ * @taskSupport forbidden
  */
-
-export interface GetInactiveUsersInput {}
 
 export interface User {
   id?: number;
@@ -24,6 +24,8 @@ export interface User {
   createdAt: string;
 }
 
+export interface GetInactiveUsersInput {}
+
 export interface GetInactiveUsersSuccessData {
   users: User[];
   count: number;
@@ -35,6 +37,4 @@ export type GetInactiveUsersOutput = {
   data: GetInactiveUsersSuccessData;
 };
 
-export async function getInactiveUsers(
-  input: GetInactiveUsersInput
-): Promise<GetInactiveUsersOutput>;
+export async function getInactiveUsers(input?: GetInactiveUsersInput): Promise<GetInactiveUsersOutput>;

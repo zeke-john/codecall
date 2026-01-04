@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.demo.validateEmailFormat({ email: "test@example.com" })
+ * await tools.test.validateEmailFormat({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -9,6 +9,8 @@
  * @readOnly true
  * @destructive false
  * @idempotent true
+ * @openWorld false
+ * @taskSupport forbidden
  */
 
 export interface ValidateEmailFormatInput {
@@ -26,6 +28,4 @@ export type ValidateEmailFormatOutput = {
   data: ValidateEmailFormatSuccessData;
 };
 
-export async function validateEmailFormat(
-  input: ValidateEmailFormatInput
-): Promise<ValidateEmailFormatOutput>;
+export async function validateEmailFormat(input: ValidateEmailFormatInput): Promise<ValidateEmailFormatOutput>;

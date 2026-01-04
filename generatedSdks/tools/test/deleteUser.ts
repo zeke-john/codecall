@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.demo.deleteUser({ id: 1 })
+ * await tools.test.deleteUser({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -9,11 +9,9 @@
  * @readOnly false
  * @destructive true
  * @idempotent true
+ * @openWorld false
+ * @taskSupport forbidden
  */
-
-export interface DeleteUserInput {
-  id: number;
-}
 
 export interface User {
   id?: number;
@@ -26,6 +24,10 @@ export interface User {
   createdAt: string;
 }
 
+export interface DeleteUserInput {
+  id: number;
+}
+
 export interface DeleteUserSuccessData {
   user: User;
   action: "deleted";
@@ -36,6 +38,4 @@ export type DeleteUserOutput = {
   data: DeleteUserSuccessData;
 };
 
-export async function deleteUser(
-  input: DeleteUserInput
-): Promise<DeleteUserOutput>;
+export async function deleteUser(input: DeleteUserInput): Promise<DeleteUserOutput>;

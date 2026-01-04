@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.demo.getUsersCreatedAfter({ date: "2023-01-01" })
+ * await tools.test.getUsersCreatedAfter({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -9,12 +9,9 @@
  * @readOnly true
  * @destructive false
  * @idempotent true
+ * @openWorld false
+ * @taskSupport forbidden
  */
-
-export interface GetUsersCreatedAfterInput {
-  date: string;
-  includeInactive?: boolean;
-}
 
 export interface User {
   id?: number;
@@ -25,6 +22,11 @@ export interface User {
   favoriteColor?: string;
   isActive: boolean;
   createdAt: string;
+}
+
+export interface GetUsersCreatedAfterInput {
+  date: string;
+  includeInactive?: boolean;
 }
 
 export interface GetUsersCreatedAfterSuccessData {
@@ -38,6 +40,4 @@ export type GetUsersCreatedAfterOutput = {
   data: GetUsersCreatedAfterSuccessData;
 };
 
-export async function getUsersCreatedAfter(
-  input: GetUsersCreatedAfterInput
-): Promise<GetUsersCreatedAfterOutput>;
+export async function getUsersCreatedAfter(input: GetUsersCreatedAfterInput): Promise<GetUsersCreatedAfterOutput>;

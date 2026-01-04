@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.demo.getActiveUsers({})
+ * await tools.test.getActiveUsers({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -9,9 +9,9 @@
  * @readOnly true
  * @destructive false
  * @idempotent true
+ * @openWorld false
+ * @taskSupport forbidden
  */
-
-export interface GetActiveUsersInput {}
 
 export interface User {
   id?: number;
@@ -24,6 +24,8 @@ export interface User {
   createdAt: string;
 }
 
+export interface GetActiveUsersInput {}
+
 export interface GetActiveUsersSuccessData {
   users: User[];
   count: number;
@@ -35,6 +37,4 @@ export type GetActiveUsersOutput = {
   data: GetActiveUsersSuccessData;
 };
 
-export async function getActiveUsers(
-  input: GetActiveUsersInput
-): Promise<GetActiveUsersOutput>;
+export async function getActiveUsers(input?: GetActiveUsersInput): Promise<GetActiveUsersOutput>;

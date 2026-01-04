@@ -62,11 +62,12 @@ This is the ONLY way to call these functions at runtime. The function declaratio
 
 You MUST extract and include ALL of the following from each tool definition:
 - name, title, description
-- inputSchema: ALL properties, their types, descriptions, required fields, default values, enums
+- inputSchema: ALL properties with types, descriptions, required fields, default values, enums, validation constraints (min/max, minLength/maxLength, pattern, format)
 - outputSchema: The COMPLETE output structure including success AND error response patterns
 - annotations: readOnlyHint, destructiveHint, idempotentHint, openWorldHint
+- execution: taskSupport if present (forbidden/optional/required)
 
-DO NOT OMIT ANY INFORMATION. Every property, every description, every type constraint must be captured.
+DO NOT OMIT ANY INFORMATION. Every property, every description, every type constraint, every validation rule must be captured.
 
 ## SDK FILE STRUCTURE RULES
 
@@ -82,13 +83,17 @@ DO NOT OMIT ANY INFORMATION. Every property, every description, every type const
     * @readOnly {true/false}
     * @destructive {true/false}
     * @idempotent {true/false}
+    * @openWorld {true/false}
+    * @taskSupport {forbidden/optional/required} (if execution.taskSupport is present)
     */
 
 2. Define ALL interfaces with JSDoc comments from descriptions
 3. Convert JSON Schema types to TypeScript (string, number, boolean, arrays, objects)
 4. Use union types for enums (e.g., status: "active" | "inactive")
 5. Mark optional fields with ? based on the "required" array
-6. Use camelCase for function/file names, PascalCase for interfaces
+6. Document defaults in JSDoc: /** @default "value" */
+7. Document validation constraints in JSDoc: /** @minimum 1 @maximum 100 */ or /** @pattern ^[a-z]+$ */
+8. Use camelCase for function/file names, PascalCase for interfaces
 
 ## OUTPUT SCHEMA HANDLING
 
@@ -101,21 +106,24 @@ When outputSchema is NOT provided: Use Promise<unknown> as the return type.
 
 ## COMPLETE EXAMPLE SDK FILE
 
-Here is an example of a WELL-GENERATED SDK file for a tool that clones a user (remember, this is just an example to use as a reference):
+Here is an example of a WELL-GENERATED SDK file for a search tool with enums, defaults, and pagination (remember, this is just an example to use as a reference):
 
 \`\`\`typescript
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.userManagement.cloneUser({ sourceId: 1, newEmail: "new@email.com" })
+ * await tools.userManagement.searchUsers({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
- * @title Clone User
- * @description Create a copy of an existing user with a new email address.
- * @readOnly false
+ * @title Search Users
+ * @description Search users by name, email, address, or phone. Supports partial matching and pagination.
+ * @readOnly true
  * @destructive false
- * @idempotent false
+ * @idempotent true
+ * @openWorld false
  */
+
+export type SearchField = "name" | "email" | "address" | "phone" | "all";
 
 export interface User {
   id?: number;
@@ -128,35 +136,40 @@ export interface User {
   createdAt: string;
 }
 
-export interface CloneUserInput {
-  /** The ID of the user to clone */
-  sourceId: number;
-  /** The email address for the new cloned user */
-  newEmail: string;
-  /** Optional new name for the cloned user (defaults to source user's name) */
-  newName?: string;
+export interface SearchUsersInput {
+  /** The search query string for partial matching */
+  query: string;
+  /** Which field to search in @default "all" */
+  field?: SearchField;
+  /** Maximum number of results to return @minimum 1 @maximum 100 */
+  limit?: number;
+  /** Number of results to skip for pagination @minimum 0 */
+  offset?: number;
 }
 
-export interface CloneUserSuccessData {
-  /** The newly created cloned user */
-  clonedUser: User;
-  /** The original user that was cloned */
-  sourceUser: User;
+export interface SearchUsersSuccessData {
+  /** Array of matching users */
+  users: User[];
+  /** Total number of matches (before pagination) */
+  total: number;
+  /** The limit that was applied */
+  limit: number;
+  /** The offset that was applied */
+  offset: number;
+  /** Whether there are more results beyond this page */
+  hasMore: boolean;
 }
 
-export interface CloneUserError {
-  /** Error code identifying the type of error */
+export interface SearchUsersError {
   code: string;
-  /** Human-readable error message */
   message: string;
 }
 
-export type CloneUserOutput =
-  | { success: true; data: CloneUserSuccessData }
-  | { success: false; error: CloneUserError };
+export type SearchUsersOutput =
+  | { success: true; data: SearchUsersSuccessData }
+  | { success: false; error: SearchUsersError };
 
-
-export async function cloneUser(input: CloneUserInput): Promise<CloneUserOutput>;
+export async function searchUsers(input: SearchUsersInput): Promise<SearchUsersOutput>;
 \`\`\`
 
 ## OUTPUT FORMAT
@@ -179,6 +192,7 @@ export async function generateSDKFromLLM(
     inputSchema: tool.inputSchema,
     outputSchema: tool.outputSchema,
     annotations: tool.annotations,
+    execution: tool.execution,
   }));
 
   const userPrompt = `Source Name: "${source.name}"
@@ -189,12 +203,13 @@ ${JSON.stringify(toolsForPrompt, null, 2)}
 
 CRITICAL INSTRUCTIONS:
 1. Extract EVERY piece of information from each tool definition - do not omit anything
-2. For each inputSchema property: include the type, description, whether it's required, any enums/defaults
+2. For each inputSchema property: include the type, description, whether it's required, any enums/defaults, and validation constraints (min/max, minLength/maxLength, pattern, format)
 3. For each outputSchema: create complete TypeScript types for BOTH success and error responses
-4. Include all annotations (readOnlyHint, destructiveHint, idempotentHint) in the header comment
-5. Add JSDoc comments with descriptions for every interface property
-6. Include example success/error responses in the function's JSDoc comment
-7. For tools WITHOUT outputSchema, use Promise<unknown> as the return type
+4. Include all annotations (readOnlyHint, destructiveHint, idempotentHint, openWorldHint) in the header comment
+5. If execution.taskSupport is present, include it in the header comment as @taskSupport
+6. Add JSDoc comments with descriptions for every interface property
+7. Document defaults with @default and validation constraints with @minimum/@maximum/@pattern etc in JSDoc
+8. For tools WITHOUT outputSchema, use Promise<unknown> as the return type
 
 Generate comprehensive SDK files that capture ALL available type information.
 Return ONLY valid JSON, no markdown.`;

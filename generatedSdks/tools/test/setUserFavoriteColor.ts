@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.demo.setUserFavoriteColor({ id: 1, color: "blue" })
+ * await tools.test.setUserFavoriteColor({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -9,12 +9,9 @@
  * @readOnly false
  * @destructive false
  * @idempotent true
+ * @openWorld false
+ * @taskSupport forbidden
  */
-
-export interface SetUserFavoriteColorInput {
-  id: number;
-  color: string | null;
-}
 
 export interface User {
   id?: number;
@@ -25,6 +22,11 @@ export interface User {
   favoriteColor?: string;
   isActive: boolean;
   createdAt: string;
+}
+
+export interface SetUserFavoriteColorInput {
+  id: number;
+  color: string | null;
 }
 
 export interface SetUserFavoriteColorSuccessData {
@@ -38,6 +40,4 @@ export type SetUserFavoriteColorOutput = {
   data: SetUserFavoriteColorSuccessData;
 };
 
-export async function setUserFavoriteColor(
-  input: SetUserFavoriteColorInput
-): Promise<SetUserFavoriteColorOutput>;
+export async function setUserFavoriteColor(input: SetUserFavoriteColorInput): Promise<SetUserFavoriteColorOutput>;
