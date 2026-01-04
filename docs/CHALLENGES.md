@@ -10,11 +10,11 @@ MCP tool definitions include `inputSchema` (what you pass to a tool) but `output
 const tasks = await tools.todoist.getTasks({ filter: "today" });
 
 for (const task of tasks) {
-  console.log(task.title);  // BUG: actual property is "name", not "title"
+  console.log(task.title);  // actual property is "name", not "title"
 }
 
 if (task.dueDate === "2024-01-15") { ... }
-// BUG: actual structure is task.due, not task.dueDate
+// actual structure is task.due, not task.dueDate
 ```
 
 The code looks correct but fails at runtime because the model hallucinated the return type based on common naming patterns...
