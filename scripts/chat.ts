@@ -2,9 +2,12 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 import * as readline from "readline";
+import * as path from "path";
 import { loadMCPServers, MCPServerEntry } from "../src/mcp/loader";
 import { TraditionalAgent } from "../src/agents/traditionalAgent";
+import { CodecallAgent } from "../src/agents/codecallAgent";
 import { MCPServerConfig } from "../src/mcp/mcpClient";
+import { AgentInterface } from "../src/types";
 
 const COLORS = {
   reset: "\x1b[0m",
@@ -59,20 +62,26 @@ function parseArgs(): MCPServerEntry[] {
   return servers;
 }
 
-function getDefaultServers(): MCPServerConfig[] {
-  const servers: MCPServerConfig[] = [
+function getDefaultServers(): MCPServerEntry[] {
+  const servers: MCPServerEntry[] = [
     {
-      type: "http",
-      url: "http://localhost:4001/mcp",
+      namespace: "test",
+      config: {
+        type: "http",
+        url: "http://localhost:4001/mcp",
+      },
     },
   ];
 
   if (process.env.TODOIST_API_KEY) {
     servers.push({
-      type: "stdio",
-      command: "npx",
-      args: ["@doist/todoist-ai"],
-      env: { TODOIST_API_KEY: process.env.TODOIST_API_KEY },
+      namespace: "todoist",
+      config: {
+        type: "stdio",
+        command: "npx",
+        args: ["@doist/todoist-ai"],
+        env: { TODOIST_API_KEY: process.env.TODOIST_API_KEY },
+      },
     });
   }
 
@@ -80,10 +89,13 @@ function getDefaultServers(): MCPServerConfig[] {
 }
 
 async function main() {
+  const useCodecall = process.argv.includes("--codecall");
   const customServers = parseArgs();
   const serversToLoad =
     customServers.length > 0 ? customServers : getDefaultServers();
 
+  const agentMode = useCodecall ? "Codecall" : "Traditional";
+  console.log(`${COLORS.cyan}Starting ${agentMode} agent...${COLORS.reset}`);
   console.log(`${COLORS.cyan}Connecting to MCP servers...${COLORS.reset}`);
 
   let loaded;
@@ -101,16 +113,26 @@ async function main() {
   const toolPaths = registry.getRegisteredPaths();
 
   console.log(
-    `${COLORS.green}Connected! ${toolPaths.length} tools available.${COLORS.reset}`
+    `${COLORS.green}Connected! ${toolPaths.length} MCP tools available.${COLORS.reset}`
   );
-  console.log(
-    `${COLORS.dim}Tools: ${toolPaths.slice(0, 5).join(", ")}${
-      toolPaths.length > 5 ? ` ...and ${toolPaths.length - 5} more` : ""
-    }${COLORS.reset}`
-  );
-  console.log();
 
-  const agent = new TraditionalAgent({ registry });
+  let agent: AgentInterface;
+
+  if (useCodecall) {
+    const sdkDir = path.join(process.cwd(), "generatedSdks");
+    agent = new CodecallAgent({ mcpRegistry: registry, sdkDir });
+    console.log(
+      `${COLORS.dim}Mode: Codecall (2 internal tools, SDK file tree in system prompt)${COLORS.reset}`
+    );
+  } else {
+    agent = new TraditionalAgent({ registry });
+    console.log(
+      `${COLORS.dim}Tools: ${toolPaths.slice(0, 5).join(", ")}${
+        toolPaths.length > 5 ? ` ...and ${toolPaths.length - 5} more` : ""
+      }${COLORS.reset}`
+    );
+  }
+  console.log();
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -157,8 +179,43 @@ async function main() {
             process.stdout.write(text);
           },
           onToolCall: (tc) => {
+            const argsStr = JSON.stringify(tc.arguments, null, 2);
+            const indentedArgs = argsStr
+              .split("\n")
+              .map((line) => `  ${line}`)
+              .join("\n");
             process.stdout.write(
-              `\n${COLORS.yellow}→ ${tc.name}${COLORS.reset}\n`
+              `\n${COLORS.yellow}→ ${tc.name}${COLORS.reset}\n${COLORS.dim}${indentedArgs}${COLORS.reset}\n`
+            );
+          },
+          onToolResult: (tr) => {
+            const statusColor = tr.isError ? COLORS.yellow : COLORS.green;
+            const statusLabel = tr.isError ? "ERROR" : "OK";
+            const resultStr = JSON.stringify(tr.result, null, 2);
+            const lines = resultStr.split("\n");
+            const maxLen = Math.min(
+              80,
+              Math.max(...lines.map((l) => l.length), 20)
+            );
+            const topBorder = "┌" + "─".repeat(maxLen + 2) + "┐";
+            const bottomBorder = "└" + "─".repeat(maxLen + 2) + "┘";
+            const paddedLines = lines.map((line) => {
+              const padding = " ".repeat(Math.max(0, maxLen - line.length));
+              return `│ ${line}${padding} │`;
+            });
+            process.stdout.write(
+              `${statusColor} ${statusLabel} -> ${COLORS.reset}\n${
+                COLORS.dim
+              }${topBorder}\n${paddedLines.join("\n")}\n${bottomBorder}${
+                COLORS.reset
+              }\n`
+            );
+          },
+          onProgress: (data) => {
+            const progressStr =
+              typeof data === "string" ? data : JSON.stringify(data);
+            process.stdout.write(
+              `${COLORS.cyan}⟳ ${progressStr}${COLORS.reset}\n`
             );
           },
           onComplete: () => {

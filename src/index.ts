@@ -46,3 +46,9 @@ export {
   TraditionalAgent,
   TraditionalAgentConfig,
 } from "./agents/traditionalAgent";
+export { CodecallAgent, CodecallAgentConfig } from "./agents/codecallAgent";
+export {
+  createInternalTools,
+  generateFileTree,
+  InternalToolsConfig,
+} from "./core/internalTools";

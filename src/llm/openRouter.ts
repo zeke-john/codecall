@@ -10,7 +10,7 @@ import {
 } from "../types";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_MODEL = "openai/gpt-oss-safeguard-20b";
+const DEFAULT_MODEL = "anthropic/claude-sonnet-4.5";
 
 export interface OpenRouterConfig {
   apiKey?: string;

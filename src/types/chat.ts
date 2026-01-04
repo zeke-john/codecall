@@ -95,9 +95,18 @@ export interface TurnStats {
   toolCallsCount: number;
 }
 
+export interface ToolResult {
+  toolCallId: string;
+  toolName: string;
+  result: unknown;
+  isError: boolean;
+}
+
 export interface StreamCallbacks {
   onText?: (text: string) => void;
   onToolCall?: (toolCall: ToolCallRequest) => void;
+  onToolResult?: (result: ToolResult) => void;
+  onProgress?: (data: unknown) => void;
   onComplete?: () => void;
   onError?: (error: Error) => void;
 }
