@@ -6,7 +6,8 @@ Codecall changes how agents interact with tools by letting them **write and exec
 
 Works with **MCP servers** and **standard tool definitions**.
 
-> [!NOTE] > **Before reading** :)
+> [!NOTE]
+> **Before reading** :)
 >
 > Please keep in mind all of this is the **future plan** for Codecall and how it will work. Codecall is still a WIP and not production ready.
 >
