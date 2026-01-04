@@ -10,7 +10,8 @@
     "test:mcp": "ts-node scripts/testMcpToSdk.ts",
     "mcp": "tsx demoMCP/index.ts --watch",
     "inspect": "npx @modelcontextprotocol/inspector tsx demoMCP/index.ts",
-    "chat": "tsx scripts/chat.ts"
+    "chat": "tsx scripts/chat.ts",
+    "codecall": "tsx scripts/chat.ts --codecall"
   },
   "keywords": [],
   "author": "",

@@ -199,15 +199,23 @@ function progress(data: unknown): void {
   console.log(JSON.stringify({ type: "progress", data }));
 }
 
-function validateResult(value: unknown, path = "result"): void {
+function validateResult(value: unknown, path = "result", isTopLevel = true): void {
   if (value === undefined) {
-    throw new Error(\`Undefined value at '\${path}'. This usually means you accessed a property that doesn't exist on the object.\`);
+    if (isTopLevel) {
+      throw new Error("Return value is undefined. Make sure your code returns a value.");
+    }
+    return;
   }
   if (value === null) return;
   if (Array.isArray(value)) {
-    value.forEach((item, i) => validateResult(item, \`\${path}[\${i}]\`));
+    value.forEach((item, i) => {
+      if (item === undefined) {
+        throw new Error(\`Undefined value at '\${path}[\${i}]'. Array elements cannot be undefined.\`);
+      }
+      validateResult(item, \`\${path}[\${i}]\`, false);
+    });
   } else if (typeof value === "object") {
-    Object.entries(value).forEach(([k, v]) => validateResult(v, \`\${path}.\${k}\`));
+    Object.entries(value).forEach(([k, v]) => validateResult(v, \`\${path}.\${k}\`, false));
   }
 }
 

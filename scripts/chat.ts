@@ -65,7 +65,7 @@ function parseArgs(): MCPServerEntry[] {
 function getDefaultServers(): MCPServerEntry[] {
   const servers: MCPServerEntry[] = [
     {
-      namespace: "test",
+      namespace: "demo",
       config: {
         type: "http",
         url: "http://localhost:4001/mcp",
@@ -215,7 +215,7 @@ async function main() {
             const progressStr =
               typeof data === "string" ? data : JSON.stringify(data);
             process.stdout.write(
-              `${COLORS.cyan}⟳ ${progressStr}${COLORS.reset}\n`
+              `${COLORS.cyan}... ${progressStr}${COLORS.reset}\n`
             );
           },
           onComplete: () => {

@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.test.setUserFavoriteColor({ id: 1, color: "blue" })
+ * await tools.demo.setUserFavoriteColor({ id: 1, color: "blue" })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -38,4 +38,6 @@ export type SetUserFavoriteColorOutput = {
   data: SetUserFavoriteColorSuccessData;
 };
 
-export async function setUserFavoriteColor(input: SetUserFavoriteColorInput): Promise<SetUserFavoriteColorOutput>;
+export async function setUserFavoriteColor(
+  input: SetUserFavoriteColorInput
+): Promise<SetUserFavoriteColorOutput>;

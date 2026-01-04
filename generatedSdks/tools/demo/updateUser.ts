@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.test.updateUser({ id: 1, name: "Updated Name" })
+ * await tools.demo.updateUser({ id: 1, name: "Updated Name" })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -41,4 +41,6 @@ export type UpdateUserOutput = {
   data: UpdateUserSuccessData;
 };
 
-export async function updateUser(input: UpdateUserInput): Promise<UpdateUserOutput>;
+export async function updateUser(
+  input: UpdateUserInput
+): Promise<UpdateUserOutput>;

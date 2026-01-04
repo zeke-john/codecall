@@ -28,36 +28,36 @@ function buildSystemPrompt(fileTree: string, customPrompt?: string): string {
   return `
 You are an assistant that completes tasks by executing actions programmatically when the user needs it.
 
-Available SDK Files ->
+## Available SDK Files
 
 Below is the file tree of all available tool SDK files. Each file contains the types and function signature for calling that tool:
 
+\`\`\`
 ${fileTree}
+\`\`\`
 
 ## Workflow
-
 1. Look at the SDK file tree above to identify relevant tools
 2. Use readFile() to read the SDK files and understand input/output types
 3. Write comprehensive TypeScript code to accomplish the task in a SINGLE executeCode() call
 4. Use progress() throughout your code to provide real-time updates to the user
 
-## Using progress()
-
 ALWAYS use progress() to show intermediate updates during code execution. This is critical for user experience:
 
-progress("Loading users...");
-progress({ step: "Processing", current: 5, total: 20 });
-progress({ step: "Complete", processed: 20, failed: 0 });
-
-Call progress() at meaningful checkpoints:
+Examples of times to use progress():
 - Before/after loading data
 - During loops (every N iterations)
-- When completing major steps
+- When completing steps
+
+Example:
+\`\`\`
+  progress("Loading users...");
+  progress({ step: "Processing", current: 5, total: 20 });
+  progress({ step: "Complete", processed: 20, failed: 0 });
+\`\`\`
 
 ## Code Execution Rules
-
-- All tool calls are async: await tools.test.getUsers({})
-- Handle errors with try/catch
+- All tool calls are async, run them via await tools.namespace.functionName({})
 - Return a structured result at the end that summarizes what happened
 - Write comprehensive code that handles the entire task in one execution`;
 }
@@ -84,7 +84,7 @@ export class CodecallAgent implements AgentInterface {
     const { mcpRegistry, sdkDir, openRouter, systemPrompt } = config;
     this.sdkDir = sdkDir;
 
-    const sandbox = new Sandbox(mcpRegistry);
+    const sandbox = new Sandbox(mcpRegistry, 10 * 60 * 1000);
 
     this.internalRegistry = new ToolRegistry();
     const internalTools = createInternalTools({
@@ -133,6 +133,8 @@ export class CodecallAgent implements AgentInterface {
   ): Promise<{ message: AssistantMessage | null; stats: TurnStats }> {
     this.currentCallbacks = callbacks;
 
+    const turnStartIdx = this.history.length;
+
     this.history.push({
       role: "user",
       content: message,
@@ -147,7 +149,57 @@ export class CodecallAgent implements AgentInterface {
     };
 
     const result = await this.runAgentLoop(callbacks, stats);
+
+    this.compactTurnHistory(turnStartIdx);
+
     return { message: result, stats };
+  }
+
+  private compactTurnHistory(turnStartIdx: number): void {
+    const finalIdx = this.history.length - 1;
+
+    if (finalIdx <= turnStartIdx) {
+      return;
+    }
+
+    let lastToolCallAssistantIdx = -1;
+    for (let i = finalIdx - 1; i > turnStartIdx; i--) {
+      const msg = this.history[i];
+      if (
+        msg.role === "assistant" &&
+        "tool_calls" in msg &&
+        msg.tool_calls &&
+        msg.tool_calls.length > 0
+      ) {
+        lastToolCallAssistantIdx = i;
+        break;
+      }
+    }
+
+    if (lastToolCallAssistantIdx === -1) {
+      return;
+    }
+
+    const userMessage = this.history[turnStartIdx];
+    const lastToolCallAssistant = this.history[lastToolCallAssistantIdx];
+    const finalMessage = this.history[finalIdx];
+
+    const toolResults: ChatMessage[] = [];
+    for (let i = lastToolCallAssistantIdx + 1; i < finalIdx; i++) {
+      const msg = this.history[i];
+      if (msg.role === "tool") {
+        toolResults.push(msg);
+      }
+    }
+
+    const baseHistory = this.history.slice(0, turnStartIdx);
+    this.history = [
+      ...baseHistory,
+      userMessage,
+      lastToolCallAssistant,
+      ...toolResults,
+      finalMessage,
+    ];
   }
 
   private async runAgentLoop(

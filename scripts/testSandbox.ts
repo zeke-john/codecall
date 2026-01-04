@@ -21,6 +21,12 @@ async function main() {
   });
   registry.registerMCP("todoist", connection);
 
+  const demoConnection = await MCPConnection.connect({
+    type: "http",
+    url: "http://localhost:4001/mcp",
+  });
+  registry.registerMCP("demo", demoConnection);
+
   console.log("all tools:", registry.getRegisteredPaths());
 
   const result = await sandbox.execute(

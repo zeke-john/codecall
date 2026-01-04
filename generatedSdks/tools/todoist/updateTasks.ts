@@ -28,8 +28,6 @@ export interface UpdateTaskItem {
   order?: number;
   /** The new priority: p1, p2, p3, p4. */
   priority?: "p1" | "p2" | "p3" | "p4";
-  /** New due date in natural language. */
-  dueString?: string;
   /** New deadline date in ISO 8601. Use "remove" to clear. */
   deadlineDate?: string;
   /** Duration string: "2h", "90m", etc. */
@@ -61,4 +59,6 @@ export interface UpdateTasksOutput {
   };
 }
 
-export async function updateTasks(input: UpdateTasksInput): Promise<UpdateTasksOutput>;
+export async function updateTasks(
+  input: UpdateTasksInput
+): Promise<UpdateTasksOutput>;

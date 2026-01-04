@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.test.getUsersCreatedAfter({ date: "2023-01-01" })
+ * await tools.demo.getUsersCreatedAfter({ date: "2023-01-01" })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -38,4 +38,6 @@ export type GetUsersCreatedAfterOutput = {
   data: GetUsersCreatedAfterSuccessData;
 };
 
-export async function getUsersCreatedAfter(input: GetUsersCreatedAfterInput): Promise<GetUsersCreatedAfterOutput>;
+export async function getUsersCreatedAfter(
+  input: GetUsersCreatedAfterInput
+): Promise<GetUsersCreatedAfterOutput>;

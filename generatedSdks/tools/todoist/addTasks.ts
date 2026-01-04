@@ -18,8 +18,6 @@ export interface TaskInput {
   description?: string;
   /** The priority of the task: p1 (highest), p2 (high), p3 (medium), p4 (lowest/default). */
   priority?: "p1" | "p2" | "p3" | "p4";
-  /** The due date for the task, in natural language. */
-  dueString?: string;
   /** The deadline date for the task in ISO 8601 format (YYYY-MM-DD, e.g., "2025-12-31"). */
   deadlineDate?: string;
   /** The duration of the task. Use format: "2h", "90m", "2h30m", or "1.5h". Max 24h. */

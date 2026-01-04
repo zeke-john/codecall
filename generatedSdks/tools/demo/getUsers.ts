@@ -1,17 +1,17 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.test.getActiveUsers({})
+ * await tools.demo.getUsers({})
  *
  * This is the ONLY way to invoke this tool in your code.
  *
- * @title Get Active Users
- * @description Get all active users from the database.
+ * @title Get Users
+ * @description Get all users from the database. Returns an array of user objects with count.
  * @readOnly true
  * @destructive false
  * @idempotent true
  */
 
-export interface GetActiveUsersInput {}
+export interface GetUsersInput {}
 
 export interface User {
   id?: number;
@@ -24,15 +24,14 @@ export interface User {
   createdAt: string;
 }
 
-export interface GetActiveUsersSuccessData {
+export interface GetUsersSuccessData {
   users: User[];
   count: number;
-  totalUsers: number;
 }
 
-export type GetActiveUsersOutput = {
+export type GetUsersOutput = {
   success: true;
-  data: GetActiveUsersSuccessData;
+  data: GetUsersSuccessData;
 };
 
-export async function getActiveUsers(input: GetActiveUsersInput): Promise<GetActiveUsersOutput>;
+export async function getUsers(input: GetUsersInput): Promise<GetUsersOutput>;

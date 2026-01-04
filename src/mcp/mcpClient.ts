@@ -128,7 +128,10 @@ export class MCPConnection {
       const contentArray = response.content as Array<{
         type: string;
         text?: string;
+        json?: unknown;
+        data?: unknown;
       }>;
+
       const textContent = contentArray.find(
         (c): c is { type: "text"; text: string } =>
           c.type === "text" && typeof c.text === "string"
@@ -139,6 +142,34 @@ export class MCPConnection {
           success: false,
           content: null,
           error: textContent?.text || "Unknown error",
+        };
+      }
+
+      const structuredContent = response.structuredContent as unknown;
+      if (structuredContent !== undefined && structuredContent !== null) {
+        return {
+          success: true,
+          content: structuredContent,
+        };
+      }
+
+      const jsonContent = contentArray.find(
+        (c) => c.type === "json" && c.json !== undefined
+      );
+      if (jsonContent?.json !== undefined) {
+        return {
+          success: true,
+          content: jsonContent.json,
+        };
+      }
+
+      const resourceContent = contentArray.find(
+        (c) => c.type === "resource" && c.data !== undefined
+      );
+      if (resourceContent?.data !== undefined) {
+        return {
+          success: true,
+          content: resourceContent.data,
         };
       }
 

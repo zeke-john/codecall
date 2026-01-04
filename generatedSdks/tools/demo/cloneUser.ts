@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.test.cloneUser({ sourceId: 1, newEmail: "cloned@example.com" })
+ * await tools.demo.cloneUser({ sourceId: 1, newEmail: "cloned@example.com" })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -38,4 +38,6 @@ export type CloneUserOutput = {
   data: CloneUserSuccessData;
 };
 
-export async function cloneUser(input: CloneUserInput): Promise<CloneUserOutput>;
+export async function cloneUser(
+  input: CloneUserInput
+): Promise<CloneUserOutput>;

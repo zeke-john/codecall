@@ -22,8 +22,8 @@ async function main() {
   ]);
 
   console.log("internal tools:", registry.getRegisteredPaths());
-  console.log("test.echo:", await registry.call("test.echo", { msg: "hello" }));
-  console.log("test.add:", await registry.call("test.add", { a: 2, b: 3 }));
+  console.log("demo.echo:", await registry.call("demo.echo", { msg: "hello" }));
+  console.log("demo.add:", await registry.call("demo.add", { a: 2, b: 3 }));
 
   if (!process.env.TODOIST_API_KEY) {
     return;
