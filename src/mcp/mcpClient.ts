@@ -111,6 +111,10 @@ export class MCPConnection {
     };
   }
 
+  getServerName(): string {
+    return this.serverName;
+  }
+
   async callTool(
     toolName: string,
     args: Record<string, unknown>

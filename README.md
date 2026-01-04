@@ -489,7 +489,7 @@ Link to Hacker News post describing these -> https://news.ycombinator.com/item?i
 ### Agent
 
 - [ ] **Add internal tools** - Expose `listFiles`, `readFile`, `executeCode` to LLM
-- [ ] **Normal agent loop** - handle LLM messages and tool calls w/ streaming, just a normal agent loop
+- [ ] **Normal agent loop** - handle LLM messages and tool calls w/ streaming, just a normal agent loop w/ open router
 - [ ] **System prompt** - guide the LLM to explore SDK files, write code and etc
 
 ### More stuff
