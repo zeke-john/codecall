@@ -494,9 +494,9 @@ Link to Hacker News post describing these -> https://news.ycombinator.com/item?i
 
 ### More stuff
 
-- [ ] **Head 2 Head** - Using the same exact set of tools and a task, do a direct head to head w/ code call and a traditional agent
+- [ ] **Head to Head** - Using the same set of tools and a task, do a direct comparison w/ code call and a traditional agent
 - [ ] **Documentation** - docs and usage examples
-- [ ] **NPM Package** - an npm package for codecall
+- [ ] **NPM Package** - an npm package for codecall (down the road)
 
 ## Contributing
 
