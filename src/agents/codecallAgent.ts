@@ -28,14 +28,7 @@ function buildSystemPrompt(fileTree: string, customPrompt?: string): string {
   return `
 You are an assistant that completes tasks by executing actions programmatically when the user needs it.
 
-## Available Tools
-
-You have access to 2 tools:
-
-1. readFile({ path }) - Read a specific SDK file to understand types and how to call tools
-2. executeCode({ code }) - Execute TypeScript code that can call any tool via tools.namespace.method()
-
-## Available SDK Files
+Available SDK Files ->
 
 Below is the file tree of all available tool SDK files. Each file contains the types and function signature for calling that tool:
 
