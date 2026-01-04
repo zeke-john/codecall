@@ -1,49 +1,108 @@
-// THIS IS AN EXAMPLE OF AN SDK FILE FOR A SEARCH TOOL
-
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.todoistMcpServer.search({ ...params })
+ * await tools.userManagement.cloneUser({ sourceId: 1, newEmail: "new@email.com" })
  *
  * This is the ONLY way to invoke this tool in your code.
+ *
+ * @title Clone User
+ * @description Create a copy of an existing user with a new email address.
+ * @readOnly false
+ * @destructive false
+ * @idempotent false
+ *
+ * INPUT EXAMPLE (all parameters):
+ * {
+ *   "sourceId": 5,
+ *   "newEmail": "cloned.user@example.com",
+ *   "newName": "Cloned User Name"
+ * }
  */
 
-export interface SearchInput {
-  query: string;
+export interface User {
+  id?: number;
+  name: string;
+  email: string;
+  address: string;
+  phone: string;
+  favoriteColor?: string;
+  isActive: boolean;
+  createdAt: string;
 }
 
-export interface SearchResult {
-  id?: string;
-  title?: string;
-  url?: string;
+export interface CloneUserInput {
+  /** The ID of the user to clone */
+  sourceId: number;
+  /** The email address for the new cloned user */
+  newEmail: string;
+  /** Optional new name for the cloned user (defaults to source user's name) */
+  newName?: string;
 }
 
-export interface SearchOutput {
-  results?: SearchResult[];
+export interface CloneUserSuccessData {
+  /** The newly created cloned user */
+  clonedUser: User;
+  /** The original user that was cloned */
+  sourceUser: User;
 }
+
+export interface CloneUserError {
+  /** Error code identifying the type of error */
+  code: string;
+  /** Human-readable error message */
+  message: string;
+}
+
+export type CloneUserOutput =
+  | { success: true; data: CloneUserSuccessData }
+  | { success: false; error: CloneUserError };
 
 /**
- * INPUT EXAMPLE:
+ * Create a copy of an existing user with a new email address.
+ *
+ * SUCCESS RESPONSE EXAMPLE:
  * {
- *   "query": "test"
+ *   "success": true,
+ *   "data": {
+ *     "clonedUser": {
+ *       "id": 21,
+ *       "name": "John Doe",
+ *       "email": "new@email.com",
+ *       "address": "123 Main St",
+ *       "phone": "555-1234",
+ *       "favoriteColor": "blue",
+ *       "isActive": true,
+ *       "createdAt": "2026-01-03T12:00:00.000Z"
+ *     },
+ *     "sourceUser": {
+ *       "id": 1,
+ *       "name": "John Doe",
+ *       "email": "john@example.com",
+ *       "address": "123 Main St",
+ *       "phone": "555-1234",
+ *       "favoriteColor": "blue",
+ *       "isActive": true,
+ *       "createdAt": "2025-03-15T00:00:00.000Z"
+ *     }
+ *   }
  * }
  *
- *
- *
- * OUTPUT EXAMPLE:
+ * ERROR RESPONSE EXAMPLES:
  * {
- *   "results": [
- *     {
- *       "id": "task:6fG7fW8mjWxxVGRv",
- *       "title": "test one two three",
- *       "url": "https://app.todoist.com/app/task/6fG7fW8mjWxxVGRv"
- *     },
- *     {
- *       "id": "task:6fGWFQFpm6m9jf2M",
- *       "title": "Tweet about Donald Trump (trending now)",
- *       "url": "https://app.todoist.com/app/task/6fGWFQFpm6m9jf2M"
- *     },
- *     // ... more items
- *   ]
+ *   "success": false,
+ *   "error": {
+ *     "code": "USER_NOT_FOUND",
+ *     "message": "Source user with id 999 not found"
+ *   }
+ * }
+ *
+ * {
+ *   "success": false,
+ *   "error": {
+ *     "code": "EMAIL_EXISTS",
+ *     "message": "Email new@email.com is already in use"
+ *   }
  * }
  */
-export async function search(input: SearchInput): Promise<SearchOutput>;
+export async function cloneUser(
+  input: CloneUserInput
+): Promise<CloneUserOutput>;

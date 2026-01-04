@@ -24,11 +24,34 @@ export interface JSONSchema extends JSONSchemaProperty {
   definitions?: Record<string, JSONSchema>;
 }
 
+export interface ToolAnnotations {
+  title?: string;
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
+}
+
+export interface ToolIcon {
+  size: string;
+  uri: string;
+  mimeType?: string;
+}
+
+export interface ToolExecution {
+  taskSupport?: "forbidden" | "optional" | "required";
+}
+
 export interface ToolDefinition {
   name: string;
+  title?: string;
   description?: string;
   inputSchema: JSONSchema;
   outputSchema?: JSONSchema;
+  annotations?: ToolAnnotations;
+  execution?: ToolExecution;
+  icons?: ToolIcon[];
+  _meta?: Record<string, unknown>;
 }
 
 export interface ToolSource {

@@ -1,7 +1,14 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { ToolSource, ToolDefinition, JSONSchema } from "../types";
+import {
+  ToolSource,
+  ToolDefinition,
+  JSONSchema,
+  ToolAnnotations,
+  ToolExecution,
+  ToolIcon,
+} from "../types";
 
 export interface StdioServerConfig {
   type: "stdio";
@@ -83,8 +90,14 @@ export class MCPConnection {
 
     const tools: ToolDefinition[] = response.tools.map((tool) => ({
       name: tool.name,
+      title: tool.title,
       description: tool.description,
       inputSchema: tool.inputSchema as JSONSchema,
+      outputSchema: tool.outputSchema as JSONSchema | undefined,
+      annotations: tool.annotations as ToolAnnotations | undefined,
+      execution: tool.execution as ToolExecution | undefined,
+      icons: tool.icons as ToolIcon[] | undefined,
+      _meta: tool._meta as Record<string, unknown> | undefined,
     }));
 
     return new MCPConnection(client, serverName, version, tools);

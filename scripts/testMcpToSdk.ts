@@ -175,3 +175,6 @@ main().catch(console.error);
 
 // example of reading a generated file ->
 // npm run test:mcp -- read tools/brightData/searchEngine.ts
+
+// to run the inspector for a stdio mcp ->
+// DANGEROUSLY_OMIT_AUTH=true npx @modelcontextprotocol/inspector npx @doist/todoist-ai
