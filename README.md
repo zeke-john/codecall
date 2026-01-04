@@ -488,13 +488,13 @@ Link to Hacker News post describing these -> https://news.ycombinator.com/item?i
 
 ### Agent
 
-- [ ] **Add internal tools** - Expose `listFiles`, `readFile`, `executeCode` to LLM
-- [ ] **Normal agent loop** - handle LLM messages and tool calls w/ streaming, just a normal agent loop w/ open router
-- [ ] **System prompt** - guide the LLM to explore SDK files, write code and etc
+- [x] **Add internal tools** - Expose `listFiles`, `readFile`, `executeCode` to LLM
+- [x] **Normal agent loop** - handle LLM messages and tool calls w/ streaming, just a normal agent loop w/ open router
+- [x] **System prompt** - guide the LLM to explore SDK files, write code and etc
 
 ### More stuff
 
-- [ ] **Head to Head** - Using the same set of tools and a task, do a direct comparison w/ code call and a traditional agent
+- [ ] **Side By Side** - Using the same set of tools and a task, do a direct comparison w/ code call and a traditional agent
 - [ ] **Documentation** - docs and usage examples
 - [ ] **NPM Package** - an npm package for codecall (down the road)
 
