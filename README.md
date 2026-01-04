@@ -6,8 +6,7 @@ Codecall changes how agents interact with tools by letting them **write and exec
 
 Works with **MCP servers** and **standard tool definitions**.
 
-> [!NOTE]
-> **Before reading** :)
+> [!NOTE] > **Before reading** :)
 >
 > Please keep in mind all of this is the **future plan** for Codecall and how it will work. Codecall is still a WIP and not production ready.
 >
@@ -479,7 +478,8 @@ Link to Hacker News post describing these -> https://news.ycombinator.com/item?i
 
 - [x] **MCP Client** - connect to MCP servers via stdio/HTTP
 - [x] **Tool Registry** - unified routing for MCP + internal tools
-- [x] **Deno Sandbox** - isolated TypeScript execution with IPC bridge
+- [x] **Generate SDK Files** - For every tool, generate a well typed SDK file w/ the input & output schemas
+- [x] **Deno Sandbox** - isolated TypeScript execution with an IPC tool bridge
 - [x] **Tools Proxy** - intercept `tools.namespace.method()` calls in the deno sandbox
 - [x] **Progress Streaming** - the Real time `onProgress` callback support is working
 - [x] **Handling Errors** - the entire stack traces + numbered code on failure returns on error
