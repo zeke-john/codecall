@@ -485,10 +485,6 @@ Link to Hacker News post describing these -> https://news.ycombinator.com/item?i
 - [x] **Handling Errors** - the entire stack traces + numbered code on failure returns on error
 - [x] **Result Validation** - Catch undefined values (property access errors) similar to the above
 
-### SDK Generation
-
-WIP
-
 ### Agent
 
 - [ ] **Add internal tools** - Expose `listFiles`, `readFile`, `executeCode` to LLM
