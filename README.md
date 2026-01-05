@@ -59,7 +59,7 @@ Let models do what they're good at: **writing code**.
 
 LLMs have enormous amounts of real-world TypeScript in their training data. They're significantly better at writing code to call APIs than they are at the arbitrary JSON matching that tool calling requires.
 
-Codecall ALSO only has 2 tools (`readFile`, `executeCode`) and an SDK file tree of your tools in context, and the agent reads SDK files on demand as needed based on the task, so this makes a 30 tool setup effectively have the same base context as a 5-tool setup.
+Codecall ALSO only has 2 tools: `readFile` and `executeCode`, along with our SDK file tree of your tools that we generate ahead of time in context, and the agent reads the files on demand as needed based on the task, so this makes a 30 tool setup effectively have the same base context as a 5 tool setup, only the file tree get larger.
 
 ```typescript
 // Instead of 20+ inference passes and 90k+ tokens:
@@ -104,11 +104,11 @@ return {
 };
 ```
 
-Two inference passes. The code runs in a sandbox calling all 20 updates programmatically with step by step updates, only pulling the relevant context when it is needed. Saving tens of thousands worth of tokens and doing everything more efficiently.
+Two inference passes. The code runs in a sandbox calling all 20 updates programmatically with step by step updates, only pulling the relevant context when it is needed, and returning only what is necessary. Saving tens of thousands worth of tokens, and doing everything more efficiently.
 
 ## How Codecall Works
 
-Codecall gives the model 3 tools to work with so the model still controls the entire flow that decides what to read, what code to write, when to execute, and how to respond... so everything stays fully agentic.
+Codecall gives the model 2 tools + a file tree to work with so the model still controls the entire flow that decides what to read, what code to write, when to execute, and how to respond... so everything stays fully agentic.
 
 Instead of exposing every tool directly to the LLM for it to call, Codecall:
 
