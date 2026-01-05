@@ -31,7 +31,7 @@ Similar to #2, but traditional agents execute tools sequentially even when opera
 
 ### 4. Models are not great at Lookup
 
-Benchmarks show models have a **[10-50% failure rate](https://youtu.be/hPPTrsUzLA8?t=1513)** when searching through large datasets in context. They hallucinate field names, miss entries, and get confused by similar data.
+Benchmarks show models have a **[10-50% failure rate](https://github.com/toon-format/toon?tab=readme-ov-file#per-model-accuracy)** when searching through large datasets in context. They hallucinate field names, miss entries, and get confused by similar data.
 
 But doing this programmatically fixes this because it can just write code, as its deterministic so 0% failure rate
 
