@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.test.getInactiveUsers({ ...params })
+ * await tools.demo.getInactiveUsers({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -37,4 +37,6 @@ export type GetInactiveUsersOutput = {
   data: GetInactiveUsersSuccessData;
 };
 
-export async function getInactiveUsers(input?: GetInactiveUsersInput): Promise<GetInactiveUsersOutput>;
+export async function getInactiveUsers(
+  input?: GetInactiveUsersInput
+): Promise<GetInactiveUsersOutput>;

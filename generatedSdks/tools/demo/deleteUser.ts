@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.test.deleteUser({ ...params })
+ * await tools.demo.deleteUser({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -38,4 +38,6 @@ export type DeleteUserOutput = {
   data: DeleteUserSuccessData;
 };
 
-export async function deleteUser(input: DeleteUserInput): Promise<DeleteUserOutput>;
+export async function deleteUser(
+  input: DeleteUserInput
+): Promise<DeleteUserOutput>;

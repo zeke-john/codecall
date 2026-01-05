@@ -4,7 +4,7 @@ import express from "express";
 import { registerTools } from "./tools.js";
 
 const mcpServer = new McpServer({
-  name: "test",
+  name: "demo",
   version: "1.0.0",
   description: "description here",
   tools: {},

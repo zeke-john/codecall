@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.test.getActiveUsers({ ...params })
+ * await tools.demo.getActiveUsers({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -37,4 +37,6 @@ export type GetActiveUsersOutput = {
   data: GetActiveUsersSuccessData;
 };
 
-export async function getActiveUsers(input?: GetActiveUsersInput): Promise<GetActiveUsersOutput>;
+export async function getActiveUsers(
+  input?: GetActiveUsersInput
+): Promise<GetActiveUsersOutput>;

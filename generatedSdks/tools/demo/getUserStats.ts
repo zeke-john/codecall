@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.test.getUserStats({ ...params })
+ * await tools.demo.getUserStats({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -39,4 +39,6 @@ export type GetUserStatsOutput = {
   data: GetUserStatsSuccessData;
 };
 
-export async function getUserStats(input?: GetUserStatsInput): Promise<GetUserStatsOutput>;
+export async function getUserStats(
+  input?: GetUserStatsInput
+): Promise<GetUserStatsOutput>;

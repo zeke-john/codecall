@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.test.createUser({ ...params })
+ * await tools.demo.createUser({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -42,4 +42,6 @@ export type CreateUserOutput = {
   data: CreateUserSuccessData;
 };
 
-export async function createUser(input: CreateUserInput): Promise<CreateUserOutput>;
+export async function createUser(
+  input: CreateUserInput
+): Promise<CreateUserOutput>;

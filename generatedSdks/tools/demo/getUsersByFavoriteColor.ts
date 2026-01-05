@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.test.getUsersByFavoriteColor({ ...params })
+ * await tools.demo.getUsersByFavoriteColor({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -39,4 +39,6 @@ export type GetUsersByFavoriteColorOutput = {
   data: GetUsersByFavoriteColorSuccessData;
 };
 
-export async function getUsersByFavoriteColor(input: GetUsersByFavoriteColorInput): Promise<GetUsersByFavoriteColorOutput>;
+export async function getUsersByFavoriteColor(
+  input: GetUsersByFavoriteColorInput
+): Promise<GetUsersByFavoriteColorOutput>;

@@ -36,32 +36,41 @@ Each file contains the types and function signature for calling that tool:
 ${fileTree}
 \`\`\`
 
-## CRITICAL: Never Guess Tool Usage
+## ALWAYS call readFile() BEFORE executeCode()
 
-You MUST read SDK files before writing any code that uses tools.
+You CANNOT call any tool in executeCode() without FIRST reading its SDK file using readFile().
+This is NOT optional. This is NOT a suggestion. This is a REQUIREMENT.
 
-Never assume:
-- Parameter names
-- Required vs optional fields
-- Input/output structure and parameter semantics
-- Tool behavior beyond what is explicitly documented
+You WILL get parameters wrong if you guess. The SDK file has the EXACT parameter names.
 
-What sounds plausible is often WRONG! When reading SDK files, pay close attention to:
-1. Exact Input/Output Shapes and Schemas
-2. @description (often contains hard constraints)
-3. Required vs optional parameters (optional does NOT mean unconstrained)
-4. Parameter semantics (what the value actually means)
+### CORRECT Workflow (NO EXCEPTIONS):
+1. Identify which tools you need for the task
+2. Call readFile() for EACH tool you will use (e.g., readFile("todoist/findTasks.ts"))
+3. Read the SDK file contents carefully - note exact parameter names, required fields, constraints
+4. ONLY THEN call executeCode() using the EXACT param names from the SDK
 
-## Required Workflow
+### WRONG Workflow (NEVER DO THIS):
+1. Skip reading SDK files
+2. Call executeCode() with guessed parameter names
+3. Fail with "Invalid arguments" error
+4. Then read SDK file
+5. Fix and retry
 
-1. Decide which tools (if any) are required for the task (If none → respond directly, no SDK reads, no code execution)
-2. MANDATORY: Use readFile() to read EVERY SDK file for tools you will use
-3. Only after reading SDKs, write executeCode() using the EXACT interface definitions, semantics, from the SDK file(s)
-4. Use progress() throughout execution for user-visible updates
+This wastes time and tokens. ALWAYS read SDK files FIRST.
 
-Skipping step 2 WILL result in incorrect parameters and failed execution.
 
-## progress() Usage (Required)
+## How to Read SDK Files
+
+Use readFile() with the path relative to tools/:
+- readFile("folder/toolName.ts") - read the that tool's entire SDK file
+
+When reading SDK files, pay close attention to:
+1. The interface definition (exact parameter names and types)
+2. Required vs optional fields (marked with ?)
+3. @description comments (often contain hard constraints like "at least one filter required")
+4. Enum/union types for valid values
+
+## Using progress()
 
 Always use progress() to show intermediate updates during code execution. This is critical for user experience, like when:
 - Before and after major steps
@@ -87,7 +96,7 @@ progress({ step: "Complete", processed: 20, failed: 0 });
 
 Code is for mechanics. YOU are for reasoning.
 
-Do NOT solve clearly semantic required tasks in code using keywords or heuristics.
+Do NOT solve clearly semantic tasks in code using keywords or heuristics.
 All classification, summarization, similarity, and judgment must be done by YOU outside executeCode().
 
 ### Multi-Step Execution
@@ -99,7 +108,7 @@ Flexible Pattern:
 2. YOU reason over the data
 3. executeCode() acts on the specific items you identified
 
-Examples that REQUIRE multi-step and reasoning from YOU:
+Examples that would REQUIRE a multi-step flow:
 - "Delete all tasks that have NBA players in the name"
 - "Summarize my tasks"
 - "Find similar tasks"
@@ -118,12 +127,12 @@ Know when to complete a task in one code execution, and when to use a multi-step
 ## Failure Handling
 
 If executeCode() fails:
-- Inspect the error
-- Re-read the relevant SDK file if needed
-- Correct the code based on the SDK
-- Retry without guessing
+1. Inspect the error message
+2. Re-read the relevant SDK file
+3. Correct the code based on EXACT SDK definitions
+4. Retry
 
-Never invent parameters or fixes.
+Never invent parameters. Always use what the SDK file defines.
 `;
 }
 
@@ -144,10 +153,12 @@ export class CodecallAgent implements AgentInterface {
   private tools: OpenRouterTool[];
   private sdkDir: string;
   private currentCallbacks: StreamCallbacks | null = null;
+  private readSdkPaths: Set<string>;
 
   constructor(config: CodecallAgentConfig) {
     const { mcpRegistry, sdkDir, openRouter, systemPrompt } = config;
     this.sdkDir = sdkDir;
+    this.readSdkPaths = new Set<string>();
 
     const sandbox = new Sandbox(mcpRegistry, 10 * 60 * 1000);
 
@@ -156,6 +167,7 @@ export class CodecallAgent implements AgentInterface {
       sdkDir,
       sandbox,
       getProgressHandler: () => this.currentCallbacks?.onProgress,
+      readSdkPaths: this.readSdkPaths,
     });
     this.internalRegistry.registerInternalTools("codecall", internalTools);
 

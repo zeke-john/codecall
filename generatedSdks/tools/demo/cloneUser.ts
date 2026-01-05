@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.test.cloneUser({ ...params })
+ * await tools.demo.cloneUser({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -40,4 +40,6 @@ export type CloneUserOutput = {
   data: CloneUserSuccessData;
 };
 
-export async function cloneUser(input: CloneUserInput): Promise<CloneUserOutput>;
+export async function cloneUser(
+  input: CloneUserInput
+): Promise<CloneUserOutput>;

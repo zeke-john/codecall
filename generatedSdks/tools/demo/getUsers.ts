@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.test.getUsers({ ...params })
+ * await tools.demo.getUsers({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *

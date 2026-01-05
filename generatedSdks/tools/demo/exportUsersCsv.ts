@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.test.exportUsersCsv({ ...params })
+ * await tools.demo.exportUsersCsv({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -28,4 +28,6 @@ export type ExportUsersCsvOutput = {
   data: ExportUsersCsvSuccessData;
 };
 
-export async function exportUsersCsv(input?: ExportUsersCsvInput): Promise<ExportUsersCsvOutput>;
+export async function exportUsersCsv(
+  input?: ExportUsersCsvInput
+): Promise<ExportUsersCsvOutput>;

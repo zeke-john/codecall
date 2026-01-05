@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.test.searchUsers({ ...params })
+ * await tools.demo.searchUsers({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -47,4 +47,6 @@ export type SearchUsersOutput = {
   data: SearchUsersSuccessData;
 };
 
-export async function searchUsers(input: SearchUsersInput): Promise<SearchUsersOutput>;
+export async function searchUsers(
+  input: SearchUsersInput
+): Promise<SearchUsersOutput>;

@@ -7,6 +7,7 @@ export interface InternalToolsConfig {
   sdkDir: string;
   sandbox: Sandbox;
   getProgressHandler?: () => ((data: unknown) => void) | undefined;
+  readSdkPaths?: Set<string>;
 }
 
 interface FileTreeEntry {
@@ -91,23 +92,42 @@ function isPathSafe(basePath: string, requestedPath: string): boolean {
   return resolvedPath.startsWith(resolvedBase + path.sep);
 }
 
+function extractToolCallsFromCode(code: string): string[] {
+  const toolCallPattern = /tools\.(\w+)\.(\w+)\s*\(/g;
+  const toolCalls: string[] = [];
+  let match;
+
+  while ((match = toolCallPattern.exec(code)) !== null) {
+    const namespace = match[1];
+    const method = match[2];
+    toolCalls.push(`${namespace}/${method}.ts`);
+  }
+
+  return [...new Set(toolCalls)];
+}
+
+function normalizeSdkPath(p: string): string {
+  return p.trim().replace(/^tools\//, "");
+}
+
 export function createInternalTools(
   config: InternalToolsConfig
 ): InternalToolDefinition[] {
   const { sdkDir, sandbox, getProgressHandler } = config;
+  const readSdkPaths = config.readSdkPaths ?? new Set<string>();
   const toolsDir = path.join(sdkDir, "tools");
 
   const readFileTool: InternalToolDefinition = {
     name: "readFile",
     description:
-      "Read the contents of an SDK file to understand types and how to call the tool. Path should be relative to tools/, e.g. 'test/getUsers.ts'",
+      "REQUIRED before executeCode: Read an SDK file to get exact parameter names and types. You MUST call this for EVERY tool before using it in executeCode(). Path relative to tools/, e.g. 'todoist/findTasks.ts'",
     inputSchema: {
       type: "object",
       properties: {
         path: {
           type: "string",
           description:
-            "Path to the SDK file relative to tools/, e.g. 'test/getUsers.ts'",
+            "Path to the SDK file relative to tools/, e.g. 'todoist/findTasks.ts'",
         },
       },
       required: ["path"],
@@ -129,6 +149,7 @@ export function createInternalTools(
 
       try {
         const content = await fs.promises.readFile(fullPath, "utf-8");
+        readSdkPaths.add(filePath);
         return { content };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -140,7 +161,7 @@ export function createInternalTools(
   const executeCodeTool: InternalToolDefinition = {
     name: "executeCode",
     description:
-      "Execute TypeScript code in a sandbox. The code can call tools via tools.namespace.method(). Use progress() to provide real-time updates. Return a value at the end.",
+      "Execute TypeScript code in a sandbox. You MUST read SDK files with readFile() first and list them in sdkFilesRead. The code can call tools via tools.namespace.method(). Use progress() for updates. Return a value at the end.",
     inputSchema: {
       type: "object",
       properties: {
@@ -149,14 +170,67 @@ export function createInternalTools(
           description:
             "TypeScript code to execute. Can use 'await tools.namespace.method()' to call tools and 'progress(data)' for updates.",
         },
+        sdkFilesRead: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            'REQUIRED: List every SDK file you read for tools used in this code, e.g. ["todoist/findTasks.ts", "todoist/findProjects.ts"]. Must match tools called in code.',
+        },
       },
-      required: ["code"],
+      required: ["code", "sdkFilesRead"],
     },
     handler: async (args) => {
       const code = args.code as string;
+      const sdkFilesReadArg = args.sdkFilesRead as string[] | undefined;
 
       if (!code) {
         return { status: "error", error: "Code is required", progressLogs: [] };
+      }
+
+      if (!sdkFilesReadArg || sdkFilesReadArg.length === 0) {
+        const toolsInCode = extractToolCallsFromCode(code);
+        if (toolsInCode.length > 0) {
+          return {
+            status: "error",
+            error: `sdkFilesRead is required. You must list the SDK files for all tools used in your code.\n\nTools detected in code:\n${toolsInCode
+              .map((t) => `  - "${t}"`)
+              .join(
+                "\n"
+              )}\n\nAdd these to sdkFilesRead and ensure you called readFile() for each.`,
+            progressLogs: [],
+          };
+        }
+      }
+
+      const declared = new Set((sdkFilesReadArg ?? []).map(normalizeSdkPath));
+      const actuallyUsed = new Set(
+        extractToolCallsFromCode(code).map(normalizeSdkPath)
+      );
+
+      const missingFromManifest = [...actuallyUsed].filter(
+        (p) => !declared.has(p)
+      );
+      if (missingFromManifest.length > 0) {
+        return {
+          status: "error",
+          error: `Manifest incomplete: your code calls tools not listed in sdkFilesRead.\n\nAdd these to sdkFilesRead (and ensure you called readFile on them):\n${missingFromManifest
+            .map((p) => `  - "${p}"`)
+            .join("\n")}`,
+          progressLogs: [],
+        };
+      }
+
+      const missingReads = [...declared].filter((p) => !readSdkPaths.has(p));
+      if (missingReads.length > 0) {
+        return {
+          status: "error",
+          error: `SDK files not read before execution. You listed these in sdkFilesRead but didn't call readFile() for them:\n\n${missingReads
+            .map((p) => `  - readFile("${p}")`)
+            .join(
+              "\n"
+            )}\n\nRead these SDK files first, then retry executeCode().`,
+          progressLogs: [],
+        };
       }
 
       const onProgress = getProgressHandler?.();

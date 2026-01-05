@@ -98,7 +98,8 @@ export class Sandbox {
             const result = await this.registry.call(msg.tool, msg.args);
             proc.stdin.write(JSON.stringify({ id: msg.id, result }) + "\n");
           } catch (err) {
-            const error = err instanceof Error ? err.message : String(err);
+            let error = err instanceof Error ? err.message : String(err);
+            error = this.enhanceErrorMessage(error, msg.tool);
             proc.stdin.write(JSON.stringify({ id: msg.id, error }) + "\n");
           }
         } else if (msg.type === "progress") {
@@ -131,6 +132,26 @@ export class Sandbox {
         }
       });
     });
+  }
+
+  private enhanceErrorMessage(error: string, toolPath: string): string {
+    const isValidationError =
+      error.includes("Invalid arguments") ||
+      error.includes("invalid_type") ||
+      error.includes("invalid_value") ||
+      error.includes("validation error") ||
+      error.includes("expected") ||
+      error.includes("required");
+
+    if (isValidationError) {
+      const parts = toolPath.split(".");
+      const sdkPath =
+        parts.length >= 2 ? `${parts[0]}/${parts[1]}.ts` : `${toolPath}.ts`;
+
+      return `${error}\n\n--- SDK REMINDER ---\nThis looks like a parameter error. Did you read the SDK file first?\nUse readFile("${sdkPath}") to see the exact parameter names and types before calling this tool.`;
+    }
+
+    return error;
   }
 
   private wrapCode(userCode: string): string {
@@ -219,11 +240,6 @@ function validateResult(value: unknown, path = "result", isTopLevel = true): voi
   }
 }
 
-const USER_CODE = \`${userCode
-      .replace(/\\/g, "\\\\")
-      .replace(/`/g, "\\`")
-      .replace(/\$/g, "\\$")}\`;
-
 (async () => {
   try {
     const result = await (async () => {
@@ -237,10 +253,6 @@ const USER_CODE = \`${userCode
     const message = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error && err.stack ? err.stack : "";
     
-    const numberedCode = USER_CODE.split("\\n")
-      .map((line, i) => \`  \${String(i + 1).padStart(3, " ")} | \${line}\`)
-      .join("\\n");
-    
     const fullError = [
       \`=== ERROR ===\`,
       \`Type: \${errorName}\`,
@@ -248,9 +260,6 @@ const USER_CODE = \`${userCode
       \`\`,
       \`=== STACK TRACE ===\`,
       stack,
-      \`\`,
-      \`=== CODE THAT FAILED ===\`,
-      numberedCode,
     ].join("\\n");
     
     console.log(JSON.stringify({ type: "error", message: fullError }));

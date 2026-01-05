@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.test.setUserActiveStatus({ ...params })
+ * await tools.demo.setUserActiveStatus({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -41,4 +41,6 @@ export type SetUserActiveStatusOutput = {
   data: SetUserActiveStatusSuccessData;
 };
 
-export async function setUserActiveStatus(input: SetUserActiveStatusInput): Promise<SetUserActiveStatusOutput>;
+export async function setUserActiveStatus(
+  input: SetUserActiveStatusInput
+): Promise<SetUserActiveStatusOutput>;

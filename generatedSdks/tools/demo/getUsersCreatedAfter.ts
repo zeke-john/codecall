@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.test.getUsersCreatedAfter({ ...params })
+ * await tools.demo.getUsersCreatedAfter({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -40,4 +40,6 @@ export type GetUsersCreatedAfterOutput = {
   data: GetUsersCreatedAfterSuccessData;
 };
 
-export async function getUsersCreatedAfter(input: GetUsersCreatedAfterInput): Promise<GetUsersCreatedAfterOutput>;
+export async function getUsersCreatedAfter(
+  input: GetUsersCreatedAfterInput
+): Promise<GetUsersCreatedAfterOutput>;

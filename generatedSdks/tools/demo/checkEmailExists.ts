@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.test.checkEmailExists({ ...params })
+ * await tools.demo.checkEmailExists({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -27,4 +27,6 @@ export type CheckEmailExistsOutput = {
   data: CheckEmailExistsSuccessData;
 };
 
-export async function checkEmailExists(input: CheckEmailExistsInput): Promise<CheckEmailExistsOutput>;
+export async function checkEmailExists(
+  input: CheckEmailExistsInput
+): Promise<CheckEmailExistsOutput>;

@@ -336,122 +336,33 @@ From the code's perspective this behaves exactly like calling a normal async fun
 
 ## Progress Updates
 
-The model can use `progress()` when writing code to provide real time feedback during long-running operations. While the model could also achieve progress by making multiple smaller `executeCode()` calls, using `progress()` within a single execution is more efficient, gives better context, and reduces the number of steps too.
+The model can use `progress()` to provide real time feedback during longer running operations. This gives users visibility into what's happening without requiring multiple `executeCode()` calls like normal tools calls.
 
-Because Codecall's main benefit comes from executing comprehensive code in a single pass,
-progress updates are important for two main reasons:
+The sandbox uses stdout as an IPC channel and not a log stream, so each line is parsed as a JSON and routed based on its `type` field. A normal `console.log("hi")` isn't valid protocol JSON, so the sandbox ignores it.
 
-1. **Better UX**: Users see real-time feedback during long-running operations without multiple model calls adding cost and latency
+`progress(data)` wraps your data in the correct format (`{ type: "progress", data }`) so it gets captured, stored in `progressLogs`, and forwarded to the `onProgress` callback.
 
-2. **Model awareness**: The model receives progress logs in the `executeCode()` response and can reference them when explaining what it did.
-
-So for example, in your system prompt you can tell the model to use `progress()`:
-
-```text
-When writing code, use progress(...) to show meaningful updates. can see what is happening. For example:
-
-  progress("Loading data...");
-  progress({ step: "Processing", current: i, total });
-  progress({ step: "Sending emails", done: count });
-```
-
-Agent Code Example
+### Example
 
 ```typescript
-const allUsers = await tools.users.listAllUsers({ limit: 5000 });
-progress({
-  step: "Loaded all users",
-  totalCount: allUsers.length,
-  adminCount: allUsers.filter((u) => u.role === "admin").length,
-});
+const users = await tools.users.listAllUsers();
+progress({ step: "Loaded users", count: users.length });
 
-const adminUsers = allUsers.filter((u) => u.role === "admin");
-const sensitiveResources = await tools.resources.getSensitiveResources();
-progress({
-  step: "Loaded sensitive resources",
-  resourceCount: sensitiveResources.length,
-  resourceNames: sensitiveResources.map((r) => r.name),
-});
+const admins = users.filter((u) => u.role === "admin");
+progress({ step: "Filtered admins", count: admins.length });
 
-const revokedAccesses = [];
-const failedAccesses = [];
-
-for (let i = 0; i < adminUsers.length; i++) {
-  const admin = adminUsers[i];
-
-  for (let j = 0; j < sensitiveResources.length; j++) {
-    const resource = sensitiveResources[j];
-
-    try {
-      const result = await tools.permissions.revokeAccess({
-        userId: admin.id,
-        resourceId: resource.id,
-        reason: "security-audit",
-      });
-
-      if (result.success) {
-        revokedAccesses.push({
-          admin: admin.name,
-          email: admin.email,
-          resource: resource.name,
-          timestamp: result.timestamp,
-        });
-      } else {
-        failedAccesses.push({
-          admin: admin.name,
-          resource: resource.name,
-          reason: result.reason || "unknown",
-        });
-      }
-
-      if (((i + 1) * (j + 1)) % 10 === 0) {
-        progress({
-          step: "Revoking access",
-          admin: admin.name,
-          resource: resource.name,
-          processed: revokedAccesses.length + failedAccesses.length,
-          revoked: revokedAccesses.length,
-          failed: failedAccesses.length,
-        });
-      }
-    } catch (err) {
-      failedAccesses.push({
-        admin: admin.name,
-        resource: resource.name,
-        error: err.message,
-      });
-    }
+for (let i = 0; i < admins.length; i++) {
+  await tools.permissions.revokeAccess({ userId: admins[i].id });
+  if ((i + 1) % 10 === 0) {
+    progress({ step: "Revoking", processed: i + 1, total: admins.length });
   }
 }
 
-progress({
-  step: "Access revocation complete",
-  revoked: revokedAccesses.length,
-  failed: failedAccesses.length,
-});
-
-return {
-  execution: {
-    totalAdminsProcessed: adminUsers.length,
-    totalResourcesAffected: sensitiveResources.length,
-    totalAttempted: revokedAccesses.length + failedAccesses.length,
-    accessesRevoked: revokedAccesses.length,
-    accessesFailed: failedAccesses.length,
-    successPercentage: Math.round(
-      (revokedAccesses.length /
-        (revokedAccesses.length + failedAccesses.length)) *
-        100
-    ),
-  },
-  revokedDetails: revokedAccesses.map((r) => ({
-    ...r,
-    status: "success",
-  })),
-  failureDetails: failedAccesses.slice(0, 25),
-};
+progress({ step: "Complete", revoked: admins.length });
+return { adminsProcessed: admins.length };
 ```
 
-This keeps the UX of a "step by step" agent with user facing intermediate updates, while still getting the cost and speed benefits of single-pass execution.
+This keeps the UX of a step-by-step agent with user-facing updates while still getting the cost and speed benefits of single-pass execution.
 
 ## Why TypeScript?
 

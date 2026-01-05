@@ -1,6 +1,6 @@
 /**
  * HOW TO CALL THIS TOOL:
- * await tools.test.deactivateUsersByDomain({ ...params })
+ * await tools.demo.deactivateUsersByDomain({ ...params })
  *
  * This is the ONLY way to invoke this tool in your code.
  *
@@ -40,4 +40,6 @@ export type DeactivateUsersByDomainOutput = {
   data: DeactivateUsersByDomainSuccessData;
 };
 
-export async function deactivateUsersByDomain(input: DeactivateUsersByDomainInput): Promise<DeactivateUsersByDomainOutput>;
+export async function deactivateUsersByDomain(
+  input: DeactivateUsersByDomainInput
+): Promise<DeactivateUsersByDomainOutput>;

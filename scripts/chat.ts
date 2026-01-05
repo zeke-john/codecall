@@ -265,7 +265,7 @@ async function main() {
             const progressStr =
               typeof data === "string" ? data : JSON.stringify(data);
             process.stdout.write(
-              `${COLORS.cyan}... ${progressStr}${COLORS.reset}\n`
+              `${COLORS.cyan} -> ${progressStr}${COLORS.reset}\n`
             );
           },
           onComplete: () => {
