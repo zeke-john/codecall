@@ -2,8 +2,6 @@
 
 > An Open Source Typescript implementation of Programmatic Tool Calling for AI Agents.
 
-Codecall changes how agents interact with tools by instead of the traditional approach where the LLM makes individual tool calls one at a time, Codecall has the LLM write and execute code to orchestrate multiple tool calls programmatically to do a task, has progressive tool discovery
-
 Codecall changes how agents interact with tools by letting them **write and execute code** in sandboxes that to orchestrates multiple tool calls programmatically to do a task, rather than making individual tool calls that bloat context and increase the token usage in traditional agents
 
 This works with both **MCP servers** (http streaming, stdio) and **standard tool definitions**.
