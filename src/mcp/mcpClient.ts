@@ -44,6 +44,22 @@ function buildEnv(
   return { ...env, ...configEnv };
 }
 
+function serializeFullError(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+
+  const errorObj: Record<string, unknown> = {};
+  const errorRecord = error as unknown as Record<string, unknown>;
+
+  for (const key of Object.getOwnPropertyNames(error)) {
+    const value = errorRecord[key];
+    if (typeof value !== "function") {
+      errorObj[key] = value;
+    }
+  }
+
+  return JSON.stringify(errorObj, null, 2);
+}
+
 export class MCPConnection {
   private client: Client;
   private serverName: string;
@@ -138,10 +154,17 @@ export class MCPConnection {
       );
 
       if (response.isError) {
+        const errorInfo: Record<string, unknown> = {
+          text: textContent?.text || "Unknown error",
+          content: contentArray,
+        };
+        if (response.structuredContent) {
+          errorInfo.structuredContent = response.structuredContent;
+        }
         return {
           success: false,
           content: null,
-          error: textContent?.text || "Unknown error",
+          error: JSON.stringify(errorInfo, null, 2),
         };
       }
 
@@ -190,7 +213,7 @@ export class MCPConnection {
       return {
         success: false,
         content: null,
-        error: error instanceof Error ? error.message : String(error),
+        error: serializeFullError(error),
       };
     }
   }

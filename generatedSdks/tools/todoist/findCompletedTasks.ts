@@ -13,6 +13,17 @@
  * @taskSupport forbidden
  */
 
+/**
+ * ╔════════════════════════════════════════════════════════════════════════════╗
+ * ║  @CC LEARNED CONSTRAINT                                                   ║
+ * ║  The Todoist API returns "completion date range must not exceed 3 months" ║
+ * ║  error (HTTP 400) when querying completed tasks. The `since` and `until`  ║
+ * ║  date range MUST be within 3 months of each other. To get all-time        ║
+ * ║  completed tasks, you must iterate in 3-month chunks from the start date  ║
+ * ║  to today.                                                                ║
+ * ╚════════════════════════════════════════════════════════════════════════════╝
+ */
+
 export type TaskPriority = "p1" | "p2" | "p3" | "p4";
 export type GetBy = "completion" | "due";
 export type LabelsOperator = "and" | "or";
@@ -94,4 +105,6 @@ export interface FindCompletedTasksOutput {
   appliedFilters: Record<string, any>;
 }
 
-export async function findCompletedTasks(input: FindCompletedTasksInput): Promise<FindCompletedTasksOutput>;
+export async function findCompletedTasks(
+  input: FindCompletedTasksInput
+): Promise<FindCompletedTasksOutput>;

@@ -110,6 +110,97 @@ function normalizeSdkPath(p: string): string {
   return p.trim().replace(/^tools\//, "");
 }
 
+function formatConstraintBanner(constraint: string): string {
+  const maxLineLength = 78;
+  const contentWidth = maxLineLength - 8;
+  const normalizedConstraint = constraint
+    .replace(/\r\n/g, " ")
+    .replace(/\n/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const words = normalizedConstraint.split(" ");
+  const lines: string[] = [];
+  let currentLine = "";
+
+  for (const word of words) {
+    let processedWord = word;
+    if (processedWord.length > contentWidth) {
+      processedWord = processedWord.slice(0, contentWidth - 3) + "...";
+    }
+
+    if (currentLine.length + processedWord.length + 1 <= contentWidth) {
+      currentLine = currentLine
+        ? `${currentLine} ${processedWord}`
+        : processedWord;
+    } else {
+      if (currentLine) lines.push(currentLine);
+      currentLine = processedWord;
+    }
+  }
+  if (currentLine) lines.push(currentLine);
+
+  const paddedLines = lines.map((line) => {
+    const padding = " ".repeat(Math.max(0, contentWidth - line.length));
+    return ` * ║  ${line}${padding}║`;
+  });
+
+  const topBorder = " * ╔" + "═".repeat(maxLineLength - 2) + "╗";
+  const headerLine =
+    " * ║  @CC LEARNED CONSTRAINT" + " ".repeat(contentWidth - 21) + "║";
+  const bottomBorder = " * ╚" + "═".repeat(maxLineLength - 2) + "╝";
+
+  return [
+    "/**",
+    topBorder,
+    headerLine,
+    ...paddedLines,
+    bottomBorder,
+    " */",
+  ].join("\n");
+}
+
+export function appendLearnedConstraint(
+  toolsDir: string,
+  sdkPath: string,
+  constraint: string
+): { success: boolean; error?: string } {
+  if (!isPathSafe(toolsDir, sdkPath)) {
+    return {
+      success: false,
+      error: "Invalid path: cannot access files outside SDK directory",
+    };
+  }
+
+  const fullPath = path.join(toolsDir, sdkPath);
+
+  try {
+    const content = fs.readFileSync(fullPath, "utf-8");
+    const banner = formatConstraintBanner(constraint);
+    const firstJsDocEnd = content.indexOf("*/");
+
+    if (firstJsDocEnd === -1) {
+      return {
+        success: false,
+        error: "Could not find JSDoc comment in SDK file",
+      };
+    }
+
+    const insertPosition = firstJsDocEnd + 2;
+    const updatedContent =
+      content.slice(0, insertPosition) +
+      "\n\n" +
+      banner +
+      content.slice(insertPosition);
+
+    fs.writeFileSync(fullPath, updatedContent, "utf-8");
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: `Failed to update SDK file: ${message}` };
+  }
+}
+
 export function createInternalTools(
   config: InternalToolsConfig
 ): InternalToolDefinition[] {
@@ -120,7 +211,7 @@ export function createInternalTools(
   const readFileTool: InternalToolDefinition = {
     name: "readFile",
     description:
-      "REQUIRED before executeCode: Read an SDK file to get exact parameter names and types. You MUST call this for EVERY tool before using it in executeCode(). Path relative to tools/, e.g. 'todoist/findTasks.ts'",
+      "Read an SDK file to get exact parameter names and types. You MUST call this for a tool before using it in executeCode(). Path relative to tools/, e.g. 'folder/functionName.ts'",
     inputSchema: {
       type: "object",
       properties: {
@@ -184,7 +275,12 @@ export function createInternalTools(
       const sdkFilesReadArg = args.sdkFilesRead as string[] | undefined;
 
       if (!code) {
-        return { status: "error", error: "Code is required", progressLogs: [] };
+        return {
+          status: "error",
+          error: "Code is required",
+          progressLogs: [],
+          toolErrors: [],
+        };
       }
 
       if (!sdkFilesReadArg || sdkFilesReadArg.length === 0) {
@@ -198,6 +294,7 @@ export function createInternalTools(
                 "\n"
               )}\n\nAdd these to sdkFilesRead and ensure you called readFile() for each.`,
             progressLogs: [],
+            toolErrors: [],
           };
         }
       }
@@ -217,6 +314,7 @@ export function createInternalTools(
             .map((p) => `  - "${p}"`)
             .join("\n")}`,
           progressLogs: [],
+          toolErrors: [],
         };
       }
 
@@ -230,6 +328,7 @@ export function createInternalTools(
               "\n"
             )}\n\nRead these SDK files first, then retry executeCode().`,
           progressLogs: [],
+          toolErrors: [],
         };
       }
 

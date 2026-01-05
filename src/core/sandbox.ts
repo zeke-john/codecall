@@ -4,9 +4,14 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { ToolRegistry } from "./toolRegistry";
-import { ExecutionResult } from "../types/execution";
+import { ExecutionResult, ToolError } from "../types/execution";
 
-export { ExecutionResult };
+export { ExecutionResult, ToolError };
+
+function toolPathToSdkPath(toolPath: string): string {
+  const parts = toolPath.split(".");
+  return parts.length >= 2 ? `${parts[0]}/${parts[1]}.ts` : `${toolPath}.ts`;
+}
 
 export interface ExecuteOptions {
   onProgress?: (data: unknown) => void;
@@ -40,6 +45,22 @@ type SandboxMessage =
   | ReturnMessage
   | ErrorMessage;
 
+function serializeFullError(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+
+  const errorObj: Record<string, unknown> = {};
+  const errorRecord = error as unknown as Record<string, unknown>;
+
+  for (const key of Object.getOwnPropertyNames(error)) {
+    const value = errorRecord[key];
+    if (typeof value !== "function") {
+      errorObj[key] = value;
+    }
+  }
+
+  return JSON.stringify(errorObj, null, 2);
+}
+
 export class Sandbox {
   constructor(
     private registry: ToolRegistry,
@@ -51,6 +72,7 @@ export class Sandbox {
     options: ExecuteOptions = {}
   ): Promise<ExecutionResult> {
     const progressLogs: unknown[] = [];
+    const toolErrors: ToolError[] = [];
     const wrappedCode = this.wrapCode(tsCode);
     const tempFile = path.join(
       os.tmpdir(),
@@ -80,7 +102,12 @@ export class Sandbox {
       };
 
       const timeout = setTimeout(() => {
-        finish({ status: "error", error: "Execution timeout", progressLogs });
+        finish({
+          status: "error",
+          error: "Execution timeout",
+          progressLogs,
+          toolErrors,
+        });
       }, this.timeoutMs);
 
       const rl = readline.createInterface({ input: proc.stdout });
@@ -98,8 +125,13 @@ export class Sandbox {
             const result = await this.registry.call(msg.tool, msg.args);
             proc.stdin.write(JSON.stringify({ id: msg.id, result }) + "\n");
           } catch (err) {
-            let error = err instanceof Error ? err.message : String(err);
+            let error = serializeFullError(err);
             error = this.enhanceErrorMessage(error, msg.tool);
+            toolErrors.push({
+              toolPath: msg.tool,
+              sdkPath: toolPathToSdkPath(msg.tool),
+              errorMessage: error,
+            });
             proc.stdin.write(JSON.stringify({ id: msg.id, error }) + "\n");
           }
         } else if (msg.type === "progress") {
@@ -109,10 +141,20 @@ export class Sandbox {
           }
         } else if (msg.type === "return") {
           clearTimeout(timeout);
-          finish({ status: "success", output: msg.data, progressLogs });
+          finish({
+            status: "success",
+            output: msg.data,
+            progressLogs,
+            toolErrors,
+          });
         } else if (msg.type === "error") {
           clearTimeout(timeout);
-          finish({ status: "error", error: msg.message, progressLogs });
+          finish({
+            status: "error",
+            error: msg.message,
+            progressLogs,
+            toolErrors,
+          });
         }
       });
 
@@ -128,6 +170,7 @@ export class Sandbox {
             status: "error",
             error: stderr || `Process exited with code ${code}`,
             progressLogs,
+            toolErrors,
           });
         }
       });

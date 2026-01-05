@@ -1,6 +1,11 @@
+import * as path from "path";
 import { ToolRegistry } from "../core/toolRegistry";
 import { Sandbox } from "../core/sandbox";
-import { createInternalTools, generateFileTree } from "../core/internalTools";
+import {
+  createInternalTools,
+  generateFileTree,
+  appendLearnedConstraint,
+} from "../core/internalTools";
 import { OpenRouterClient, OpenRouterConfig } from "../llm/openRouter";
 import {
   ChatMessage,
@@ -10,6 +15,7 @@ import {
   ToolCallRequest,
   AgentInterface,
   TurnStats,
+  ToolError,
 } from "../types";
 
 export interface CodecallAgentConfig {
@@ -146,6 +152,11 @@ function toRegistryPath(apiName: string): string {
   return apiName.slice(0, idx) + "." + apiName.slice(idx + 1);
 }
 
+interface PendingRecovery {
+  sdkPath: string;
+  errorMessage: string;
+}
+
 export class CodecallAgent implements AgentInterface {
   private internalRegistry: ToolRegistry;
   private client: OpenRouterClient;
@@ -154,6 +165,7 @@ export class CodecallAgent implements AgentInterface {
   private sdkDir: string;
   private currentCallbacks: StreamCallbacks | null = null;
   private readSdkPaths: Set<string>;
+  private pendingRecoveries: Map<string, PendingRecovery> = new Map();
 
   constructor(config: CodecallAgentConfig) {
     const { mcpRegistry, sdkDir, openRouter, systemPrompt } = config;
@@ -339,6 +351,12 @@ export class CodecallAgent implements AgentInterface {
         };
       }
 
+      let shouldTriggerRecovery = false;
+      if (registryPath === "codecall.executeCode") {
+        this.trackExecuteCodeResult(result);
+        shouldTriggerRecovery = this.checkForRecovery(result);
+      }
+
       callbacks.onToolResult?.({
         toolCallId: toolCall.id,
         toolName: registryPath,
@@ -351,9 +369,144 @@ export class CodecallAgent implements AgentInterface {
         tool_call_id: toolCall.id,
         content: JSON.stringify(result),
       });
+
+      if (shouldTriggerRecovery) {
+        await this.triggerClarificationFlow(callbacks);
+      }
     }
 
     return this.runAgentLoop(callbacks, stats);
+  }
+
+  private trackExecuteCodeResult(result: unknown): void {
+    if (!result || typeof result !== "object") return;
+
+    const execResult = result as { status?: string; toolErrors?: ToolError[] };
+
+    if (
+      execResult.status === "error" &&
+      execResult.toolErrors &&
+      execResult.toolErrors.length > 0
+    ) {
+      for (const toolError of execResult.toolErrors) {
+        this.pendingRecoveries.set(toolError.sdkPath, {
+          sdkPath: toolError.sdkPath,
+          errorMessage: toolError.errorMessage,
+        });
+      }
+    }
+  }
+
+  private checkForRecovery(result: unknown): boolean {
+    if (!result || typeof result !== "object") return false;
+    const execResult = result as { status?: string };
+    return execResult.status === "success" && this.pendingRecoveries.size > 0;
+  }
+
+  private async triggerClarificationFlow(
+    callbacks: StreamCallbacks
+  ): Promise<void> {
+    const recoveries = Array.from(this.pendingRecoveries.values());
+    this.pendingRecoveries.clear();
+
+    for (const recovery of recoveries) {
+      const clarificationPrompt = `You just recovered from an error in \`${recovery.sdkPath}\`.
+
+TASK: Write a learned constraint that will help future agents avoid this error.
+
+RULES:
+1. Write 2-4 sentences ONLY - plain text, no markdown, no headers, no bullet points
+2. Include the exact error message or key phrase from it
+3. Explain what parameter/value caused it and what the correct approach is
+4. This will be inserted into the SDK file as a comment, so keep it clean
+
+THE GOAL IS TO PREVENT THIS ERROR FROM HAPPENING AGAIN, SO IF YOU WERE TO DO THIS AGAIN, WHAT INFO WOULD YOU HAVE NEEDED FOR THIS ERROR TO NOT HAPPEN?
+
+PUTTING IT IN THE SDK FILE AS A COMMENT WILL HELP FUTURE AGENTS AVOID THIS ERROR, MAKE SURE TO MAKE IT CLEAR AND CONCISE, BUT MOST IMPORTANTLY SO THEY UNDERSTAND WHAT TO DO TO AVOID THIS ERROR.
+
+FULL ERROR:
+${recovery.errorMessage}
+
+Respond with the constraint text:`;
+
+      this.history.push({
+        role: "user",
+        content: `[SYSTEM: SDK LEARNING] ${clarificationPrompt}`,
+      });
+
+      await this.requestClarificationAndUpdate(recovery.sdkPath, callbacks);
+    }
+  }
+
+  private sanitizeConstraintText(text: string): string | null {
+    let sanitized = text
+      .replace(/^#+\s*.*/gm, "")
+      .replace(/^[-*]\s+/gm, "")
+      .replace(/```[\s\S]*?```/g, "")
+      .replace(/`[^`]+`/g, (match) => match.slice(1, -1))
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/\*([^*]+)\*/g, "$1")
+      .replace(/^---+$/gm, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+
+    if (
+      sanitized.includes("##") ||
+      sanitized.includes("**") ||
+      sanitized.includes("```") ||
+      sanitized.length > 1500
+    ) {
+      return null;
+    }
+
+    if (sanitized.length < 50) {
+      return null;
+    }
+
+    return sanitized;
+  }
+
+  private async requestClarificationAndUpdate(
+    sdkPath: string,
+    callbacks: StreamCallbacks
+  ): Promise<void> {
+    const clarificationCallbacks: StreamCallbacks = {
+      onText: () => {},
+      onComplete: () => {},
+    };
+
+    const { message } = await this.client.streamChat(
+      this.history,
+      [],
+      clarificationCallbacks
+    );
+
+    if (message && message.content) {
+      this.history.push(message);
+
+      const sanitized = this.sanitizeConstraintText(message.content);
+      if (!sanitized) {
+        return;
+      }
+
+      const toolsDir = path.join(this.sdkDir, "tools");
+      const updateResult = appendLearnedConstraint(
+        toolsDir,
+        sdkPath,
+        sanitized
+      );
+
+      if (updateResult.success) {
+        const successMsg = `[SYSTEM] Updated ${sdkPath} with learned constraint.`;
+        this.history.push({ role: "user", content: successMsg });
+        callbacks.onToolResult?.({
+          toolCallId: "sdk-update",
+          toolName: "system.learnedConstraint",
+          result: { updated: sdkPath, constraint: sanitized },
+          isError: false,
+        });
+      }
+    }
   }
 
   getHistory(): ChatMessage[] {
