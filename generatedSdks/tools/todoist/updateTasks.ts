@@ -32,7 +32,8 @@ export interface TaskToUpdate {
   order?: number;
   /** The new priority of the task: p1 (highest), p2 (high), p3 (medium), p4 (lowest/default). */
   priority?: TaskPriority;
-  /** The due date for the task, in natural language ONLY (e.g. "today", "tomorrow at 9am", "Jan 15", "in 3 days", "every monday", "every weekday at 10am"); no ISO dates or structured formats are accepted. NOTE: Use simple phrases like "tomorrow", "in 2 days", "next monday". Avoid compound phrases like "day after tomorrow" which may not be parsed correctly. This is the INPUT field - the output returns `dueDate` in ISO format. */
+  /** The due date for the task, in natural language ONLY (e.g. "today", "tomorrow at 9am", "Jan 15", "in 3 days", "every monday", "every weekday at 10am"); no ISO dates or structured formats are accepted.
+   * NOTE: ONLY use simple phrases like "tomorrow", "in x days", "next monday". NEVER compound phrases like "day after tomorrow" which will not be parsed correctly. */
   dueString?: string;
   /** The new deadline date for the task in ISO 8601 format (YYYY-MM-DD, e.g., "2025-12-31"). Deadlines are immovable constraints shown with a different indicator than due dates. Use "remove" to clear the deadline. */
   deadlineDate?: string;

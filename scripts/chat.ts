@@ -18,6 +18,56 @@ const COLORS = {
   bold: "\x1b[1m",
 };
 
+function formatToolCallArgs(
+  args: Record<string, unknown>,
+  toolName: string
+): string {
+  if (toolName.endsWith("executeCode") && typeof args.code === "string") {
+    return args.code.trim();
+  }
+
+  if (toolName.endsWith("readFile") && typeof args.path === "string") {
+    return `Path: ${args.path}`;
+  }
+
+  return JSON.stringify(args, null, 2);
+}
+
+function formatToolResult(result: unknown, toolName: string): string {
+  if (result === null || result === undefined) {
+    return "null";
+  }
+
+  if (typeof result !== "object") {
+    return String(result);
+  }
+
+  const obj = result as Record<string, unknown>;
+
+  if (toolName.endsWith("readFile") && typeof obj.content === "string") {
+    return obj.content;
+  }
+
+  if (toolName.endsWith("executeCode") && obj.status !== undefined) {
+    const parts: string[] = [];
+    parts.push(`Status: ${obj.status}`);
+
+    if (obj.error) {
+      parts.push(`Error: ${obj.error}`);
+    }
+
+    if (obj.output !== undefined) {
+      parts.push("");
+      parts.push("Output:");
+      parts.push(JSON.stringify(obj.output, null, 2));
+    }
+
+    return parts.join("\n");
+  }
+
+  return JSON.stringify(result, null, 2);
+}
+
 function parseArgs(): MCPServerEntry[] {
   const args = process.argv.slice(2);
   const servers: MCPServerEntry[] = [];
@@ -179,7 +229,7 @@ async function main() {
             process.stdout.write(text);
           },
           onToolCall: (tc) => {
-            const argsStr = JSON.stringify(tc.arguments, null, 2);
+            const argsStr = formatToolCallArgs(tc.arguments, tc.name);
             const indentedArgs = argsStr
               .split("\n")
               .map((line) => `  ${line}`)
@@ -191,7 +241,7 @@ async function main() {
           onToolResult: (tr) => {
             const statusColor = tr.isError ? COLORS.yellow : COLORS.green;
             const statusLabel = tr.isError ? "ERROR" : "OK";
-            const resultStr = JSON.stringify(tr.result, null, 2);
+            const resultStr = formatToolResult(tr.result, tr.toolName);
             const lines = resultStr.split("\n");
             const maxLen = Math.min(
               80,

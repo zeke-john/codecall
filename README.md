@@ -6,8 +6,7 @@ Codecall changes how agents interact with tools by letting them **write and exec
 
 Works with **MCP servers** and **standard tool definitions**.
 
-> [!NOTE]
-> **Before reading** :)
+> [!NOTE] > **Before reading** :)
 >
 > Please keep in mind all of this is the **future plan** for Codecall and how it will work. Codecall is still a WIP and not production ready.
 >
@@ -491,6 +490,7 @@ Link to Hacker News post describing these -> https://news.ycombinator.com/item?i
 - [x] **Add internal tools** - Expose `listFiles`, `readFile`, `executeCode` to LLM
 - [x] **Normal agent loop** - handle LLM messages and tool calls w/ streaming, just a normal agent loop w/ open router
 - [x] **System prompt** - guide the LLM to explore SDK files, write code and etc
+- [] add warning for destrtive tools in code scripts the user can type y/n if they want to continue
 
 ### More stuff
 
