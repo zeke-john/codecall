@@ -1,10 +1,12 @@
 # Codecall
 
-> An open source Typescript implementation of Programmatic Tool Calling for AI Agents.
+> An Open Source Typescript implementation of Programmatic Tool Calling for AI Agents.
 
-Codecall changes how agents interact with tools by letting them **write and execute code** instead of making individual tool calls that bloat context, increase the price, and slow everything down
+Codecall changes how agents interact with tools by instead of the traditional approach where the LLM makes individual tool calls one at a time, Codecall has the LLM write and execute code to orchestrate multiple tool calls programmatically to do a task, has progressive tool discovery
 
-Works with **MCP servers** and **standard tool definitions**.
+Codecall changes how agents interact with tools by letting them **write and execute code** in sandboxes that to orchestrates multiple tool calls programmatically to do a task, rather than making individual tool calls that bloat context and increase the token usage in traditional agents
+
+This works with both **MCP servers** (http streaming, stdio) and **standard tool definitions**.
 
 > [!NOTE] > **Before reading** :)
 >
@@ -16,47 +18,29 @@ Works with **MCP servers** and **standard tool definitions**.
 
 Traditional tool calling has fundamental architectural issues that get worse at scale:
 
-### 1. Context Bloat
+### 1. Context Bloat & Wasting Tokens
 
-Every tool definition lives in your system prompt. Connect a few MCP servers and you're burning tens of thousands of tokens before the conversation even starts.
+Traditional agents send EVERY tool definition with every request, so for 20 tools that about 10k+ tokens of schema definitions in every inference call, even for questions like, "what can you do?" or "update the date for this" where they are not necessary. This scales linearly with tool count and gets multiplied by every step within a turn AND every turn in the conversation.
 
-```
-GitHub MCP:        22 tools  →  ~44,000 tokens
-Internal Tools:    12 tools  →  ~24,000 tokens
-───────────────────────────────────────────────
-Total:             34 tools  →  ~68,000 tokens (before any work happens)
-```
+### 2. N Inference Calls for N Tool Operations
 
-### 2. Inference Overhead
+Every tool operation requires a full inference round-trip, so "Delete all completed tasks" becomes: LLM calls `findTasks`, waits, calls `deleteTask` for task 1, waits, calls for task 2... Each call resends the entire conversation history including all previous tool results, so tokens compound. 20 tasks = 20+ inference calls with exponentially growing context.
 
-Each tool call requires a full model inference pass. The entire conversation history gets sent back and forth every single time.
+### 3. No Parallel Execution
 
-```
-User: "Find all admin users and update their permissions"
+Similar to #2, but traditional agents execute tools sequentially even when operations are independent. Ten API calls that could run simultaneously instead happen one-by-one with LLM reasoning between each that wastes time, tokens, and unnecessarily sends info into the model's context window and through the API provider's infrastructure.
 
-Traditional approach:
-  Turn 1: [8,000 tokens] → get_all_users()
-  Turn 2: [18,000 tokens] → filter mentally, pick first admin
-  Turn 3: [19,500 tokens] → update_user(id1, ...)
-  Turn 4: [21,000 tokens] → update_user(id2, ...)
-  Turn 5: [22,500 tokens] → update_user(id3, ...)
-  ...
-  Total: 150,000+ tokens, 12 inference passes
-```
+### 4. Models are not great at Lookup
 
-The problem also compounds because each tool call adds its output to the context, making every subsequent generation more expensive.
+Benchmarks show models have a **[10-50% failure rate](https://youtu.be/hPPTrsUzLA8?t=1513)** when searching through large datasets in context. They hallucinate field names, miss entries, and get confused by similar data.
 
-### 3. Models Are Bad at Data Lookup
-
-Benchmarks show models have a **10-50% failure rate** when searching through large datasets in context. They hallucinate field names, miss entries, and get confused by similar data.
-
-But doing this programmatically fixes this because it can just write code, as its deterministic (so 0% failure rate)
+But doing this programmatically fixes this because it can just write code, as its deterministic so 0% failure rate
 
 ```typescript
 users.filter((u) => u.role === "admin");
 ```
 
-### 4. Models were never trained for tool calling
+### 5. Models were never trained for tool calling
 
 The special tokens used for tool calls (`<tool_call>`, `</tool_call>`) are synthetic training data. Models dont have much exposure to the tool calling syntax, and have only seen contrived examples from training sets... but they DO have:
 
@@ -64,7 +48,7 @@ The special tokens used for tool calls (`<tool_call>`, `</tool_call>`) are synth
 - Lots of experience writing code to call APIs
 
 > “Making an LLM perform tasks with tool calling is like putting Shakespeare through a month-long class in Mandarin and then asking him to write a play in it. It’s just not going to be his best work.”  
-> — [Cloudflare Engineering](https://blog.cloudflare.com/code-mode/)
+> — [Cloudflare Engineering](https://blog.cloudflare.com/code-mode/#whats-wrong-with-this)
 
 #### An example of a model that WAS trained to call tools
 
@@ -76,8 +60,10 @@ Let models do what they're good at: **writing code**.
 
 LLMs have enormous amounts of real-world TypeScript in their training data. They're significantly better at writing code to call APIs than they are at the arbitrary JSON matching that tool calling requires.
 
+Codecall ALSO only has 2 tools (`readFile`, `executeCode`) and an SDK file tree of your tools in context, and the agent reads SDK files on demand as needed based on the task, so this makes a 30 tool setup effectively have the same base context as a 5-tool setup.
+
 ```typescript
-// Instead of 12+ inference passes and 150+ tokens:
+// Instead of 20+ inference passes and 90k+ tokens:
 const allUsers = await tools.users.listAllUsers();
 const adminUsers = allUsers.filter((u) => u.role === "admin");
 const resources = await tools.resources.getSensitiveResources();
@@ -119,9 +105,9 @@ return {
 };
 ```
 
-One inference pass. [~2,000 tokens. 98.7% reduction.](https://www.anthropic.com/engineering/code-execution-with-mcp)
+Two inference passes. The code runs in a sandbox calling all 20 updates programmatically with step by step updates, only pulling the relevant context when it is needed. Saving tens of thousands worth of tokens and doing everything more efficiently.
 
-## How Codecall Works (WIP)
+## How Codecall Works
 
 Codecall gives the model 3 tools to work with so the model still controls the entire flow that decides what to read, what code to write, when to execute, and how to respond... so everything stays fully agentic.
 
@@ -135,35 +121,41 @@ Instead of exposing every tool directly to the LLM for it to call, Codecall:
 - Returns the execution result back (success/error)
 - Lets the model produce a respond or continue
 
-### The 3 Available Tools:
-
-#### 1. `listFiles()`
-
-Returns the SDK file tree showing all available tools as files
+The system message by default has an SDK file tree showing all available tools as files, it just shows them the file tree and not the actual contents of each of the files, so it can progressively discover tools as it needs them for a certain task
 
 Example:
 
-`listFiles()` ->
-
 ```
 tools/
-├─ users/
-│ ├─ listAllUsers.ts
-│ ├─ getUser.ts
-│ ├─ updateUser.ts
-│ └─ ...
-├─ permissions/
-│ ├─ revokeAccess.ts
-│ ├─ grantAccess.ts
-│ ├─ listPermissions.ts
-│ └─ ...
-├─ resources/
-│ getSensitiveResources.ts
-│ listResources.ts
-└─ ...
+├─ Database
+│  ├─ checkEmailExists.ts
+│  ├─ cloneUser.ts
+│  ├─ createUser.ts
+│  ├─ deactivateUsersByDomain.ts
+│  ├─ deleteUser.ts
+│  ├─ getUsersByFavoriteColor.ts
+│  ├─ getUsersCreatedAfter.ts
+│  ├─ getUserStats.ts
+│  ├─ searchUsers.ts
+│  ├─ setUserActiveStatus.ts
+│  ├─ setUserFavoriteColor.ts
+│  ├─ updateUser.ts
+│  └─ validateEmailFormat.ts
+└─ todoist
+   ├─ addComments.ts
+   ├─ addProjects.ts
+   ├─ addSections.ts
+   ├─ addTasks.ts
+   ├─ manageAssignments.ts
+   ├─ search.ts
+   ├─ updateComments.ts
+   ├─ updateProjects.ts
+   ├─ updateSections.ts
+   ├─ updateTasks.ts
+   └─ userInfo.ts
 ```
 
-#### 2. `readFile(path: string)`
+### 1. `readFile(path: string)`
 
 Returns the full contents of a specific SDK file, including type definitions, function signatures, and schemas.
 
@@ -196,7 +188,7 @@ export interface User {
 export async function listAllUsers(input: ListAllUsersInput): Promise<User[]>;
 ```
 
-#### 3. `executeCode(code: string)`
+### 2. `executeCode(code: string)`
 
 Executes TypeScript code in a Deno sandbox. Returns either the successful output or an error w/ the execution trace.
 
@@ -236,15 +228,11 @@ Error: Undefined value at 'result[0]'...
     at validateResult (file:///.../sandbox.ts:68:11)
     at file:///.../sandbox.ts:99:5
 
-=== CODE THAT FAILED ===
-    1 |     const users = await tools.users.listAllUsers();
-    2 |     const names = users.map(u => u.nmae);
-    3 |     return names;`,
-  progressLogs: [{ step: "Loading users..." }]
+progressLogs: [{ step: "Loading users..." }]
 }
 ```
 
-The error includes the full stack trace and the numbered user code, giving the model maximum context to fix the issue.
+The error includes the full stack trace, giving the model maximum context to fix the issue and try again, then update the SDK file once fixed.
 
 ### Code Execution & Sandboxing
 
@@ -334,15 +322,72 @@ What actually happens is:
 
 From the code's perspective this behaves exactly like calling a normal async function.
 
-## Progress Updates
+### Generating SDK's from Tool Definitions
 
-The model can use `progress()` to provide real time feedback during longer running operations. This gives users visibility into what's happening without requiring multiple `executeCode()` calls like normal tools calls.
+As mentioned above, Codecall converts MCP tool definitions into TypeScript SDK files so it's clearer to reference when writing code. So when you connect an MCP server, Codecall:
+
+1. **Extracts tool definitions** - Reads all tools from the MCP server, including their `inputSchema`, `outputSchema`, descriptions, annotations (readOnly, destructive, idempotent), and execution hints
+2. **Generates TypeScript SDK files** - Uses Gemini 3 Flash to the convert JSON Schema definitions into well-typed TypeScript files with:
+   - Complete type definitions for inputs and outputs
+   - JSDoc comments with descriptions, defaults, and validation constraints
+   - Proper handling of enums, optional fields, and nested objects
+   - Success/error response types when output schemas are provided
+3. **Organizes by namespace** - Groups tools into folders (e.g., `tools/database/`, `tools/todoist/`) based on the MCP server name
+4. **Writes to disk** - Saves all SDK files to `generatedSdks/tools/{namespace}/` for the agent to discover and read on-demand
+
+This approach makes sure that the agent sees clean, well-typed TypeScript interfaces and schemas instead of raw JSON schemas, making it easier for the model to write correct code. The SDK files are also self-documenting with JSDoc comments that capture all the metadata from the original tool definitions, and that it can be edited in the future.
+
+#### Progressive SDK Learning
+
+Codecall also has a self-learning system that automatically improves the SDK documentation we generate when the agents recover from tool call errors. Unlike traditional agents that repeat the same mistakes across sessions, Codecall builds memory for what not to do that compounds over time by updating the actual SDK Files.
+
+Because Codecall writes code that strings together multiple tool calls into a single script to do the user's task, it becomes a lot more important for the tools not to fail, because even small input schema issue, or assuming the output shape it different, or guessing the wrong semantics would cause the entire script to fail, and for the agent to re-write it and fix it.
+
+##### The Flow
+
+**First agent** makes a mistake:
+
+```typescript
+// Agent calls: tools.todoist.findTasks({ })
+// Error: "At least one filter must be provided..."
+```
+
+After fixing the issue in that run, the agent automatically updates the SDK file that was unclear (which led to the issue) with this at the top:
+
+```typescript
+/**
+ * ╔════════════════════════════════════════════════════════════════════════════╗
+ * ║  @CC LEARNED CONSTRAINT                                                    ║
+ * ║  The `findTasks` tool requires "At least one filter must be provided:      ║
+ * ║  searchText, projectId, sectionId, parentId, responsibleUser, or           ║
+ * ║  labels" - you cannot call it with only `responsibleUserFiltering` or      ║
+ * ║  `limit`. To get all tasks, you must iterate through all projects          ║
+ * ║  using `projectId` as the required filter, or provide a non-empty          ║
+ * ║  `searchText`.                                                             ║
+ * ╚════════════════════════════════════════════════════════════════════════════╝
+ */
+```
+
+**Next agent** reads that same SDK file, and sees the banner immediately:
+
+```typescript
+// Agent reads: tools/todoist/findTasks.ts
+// Sees the @CC LEARNED CONSTRAINT banner at the top
+// Writes correct code from the start:
+const tasks = await tools.todoist.findTasks({ projectId: "12345" });
+```
+
+So no error, no retry, and no wasted inference. The learned constraint prevents the same mistake entirely.
+
+### Progress Updates
+
+The model uses `progress()` to provide real time feedback while a script in being executed. This gives users visibility into what's happening without requiring multiple `executeCode()` calls like normal tools calls.
 
 The sandbox uses stdout as an IPC channel and not a log stream, so each line is parsed as a JSON and routed based on its `type` field. A normal `console.log("hi")` isn't valid protocol JSON, so the sandbox ignores it.
 
 `progress(data)` wraps your data in the correct format (`{ type: "progress", data }`) so it gets captured, stored in `progressLogs`, and forwarded to the `onProgress` callback.
 
-### Example
+#### Example
 
 ```typescript
 const users = await tools.users.listAllUsers();
@@ -379,12 +424,6 @@ TypeScript also gives you:
 - Compile time validation of tool schemas
 - The model sees types and can use them correctly
 
-## Main Challenges
-
-Please reference [docs/CHALLENGES.md](https://github.com/zeke-john/codecall/blob/main/docs/CHALLENGES.md) for the codecall's main 3 challenges
-
-Link to Hacker News post describing these -> https://news.ycombinator.com/item?id=46473471
-
 ## Roadmap
 
 - [x] **MCP Client** - connect to MCP servers via stdio/HTTP
@@ -398,7 +437,7 @@ Link to Hacker News post describing these -> https://news.ycombinator.com/item?i
 
 ### Agent
 
-- [x] **Add internal tools** - Expose `listFiles`, `readFile`, `executeCode` to LLM
+- [x] **Add internal tools** - Expose the `readFile` and `executeCode` tools to Agent
 - [x] **Normal agent loop** - handle LLM messages and tool calls w/ streaming, just a normal agent loop w/ open router
 - [x] **System prompt** - guide the LLM to explore SDK files, write code and etc
 - [] add warning for destrtive tools in code scripts the user can type y/n if they want to continue
