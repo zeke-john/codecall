@@ -74,7 +74,8 @@ When reading SDK files, pay close attention to:
 1. The interface definition (exact parameter names and types)
 2. Required vs optional fields (marked with ?)
 3. @description comments (often contain hard constraints like "at least one filter required")
-4. Enum/union types for valid values
+4. @CC LEARNED CONSTRAINT banners - these are critical constraints learned from past errors. "@CC" stands for "Codecall". Always read and follow these constraints to avoid known pitfalls.
+5. Enum/union types for valid values
 
 ## Using progress()
 
