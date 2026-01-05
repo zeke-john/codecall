@@ -8,7 +8,8 @@ Codecall changes how agents interact with tools by letting them **write and exec
 
 This works with both **MCP servers** (http streaming, stdio) and **standard tool definitions**.
 
-> [!NOTE] > **Before reading** :)
+> [!NOTE]
+> **Before reading** :)
 >
 > Please keep in mind all of this is the **future plan** for Codecall and how it will work. Codecall is still a WIP and not production ready.
 >
