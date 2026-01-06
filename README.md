@@ -19,15 +19,15 @@ Traditional tool calling has fundamental architectural issues that get worse at 
 
 ### 1. Context Bloat & Wasting Tokens
 
-Traditional agents send EVERY tool definition with every request, so for 20 tools that about 10k+ tokens of schema definitions in every inference call, even for questions like, "what can you do?" or "update the date for this" where they are not necessary. This scales linearly with tool count and gets multiplied by every step within a turn AND every turn in the conversation.
+Traditional agents send EVERY tool definition with every request, so for 20 tools thats about 10k+ tokens of schema definitions in every inference call, even for questions like, "what can you do?" or "update the date for this" where they are not necessary. This issue scales with tool count and gets multiplied by every step within a turn AND every turn in the conversation.
 
 ### 2. N Inference Calls for N Tool Operations
 
-Every tool operation requires a full inference round-trip, so "Delete all completed tasks" becomes: LLM calls `findTasks`, waits, calls `deleteTask` for task 1, waits, calls for task 2... Each call resends the entire conversation history including all previous tool results, so tokens compound. 20 tasks = 20+ inference calls with exponentially growing context.
+Every tool operation requires a full inference round-trip, so "Delete all completed tasks" becomes: LLM calls `findTasks`, waits, calls `deleteTask` for task 1, waits, calls for task 2... Each call resends the entire conversation history including all previous tool results, so the tokens compound. For example those 20 steps = 20+ inference calls with exponentially growing context.
 
 ### 3. No Parallel Execution
 
-Similar to #2, but traditional agents execute tools sequentially even when operations are independent. Ten API calls that could run simultaneously instead happen one-by-one with LLM reasoning between each that wastes time, tokens, and unnecessarily sends info into the model's context window and through the API provider's infrastructure.
+Similar to #2, but traditional agents execute tools sequentially even when operations are independent. Ten API calls that could run simultaneously instead happen one at a time with the agent reasoning between each of them that wastes time, tokens, and unnecessarily sends info into the context window and through the API provider's infrastructure.
 
 ### 4. Models are not great at Lookup
 
@@ -59,7 +59,7 @@ Let models do what they're good at: **writing code**.
 
 LLMs have enormous amounts of real-world TypeScript in their training data. They're significantly better at writing code to call APIs than they are at the arbitrary JSON matching that tool calling requires.
 
-Codecall ALSO only has 2 tools: `readFile` and `executeCode`, along with our SDK file tree of your tools that we generate ahead of time in context, and the agent reads the files on demand as needed based on the task, so this makes a 30 tool setup effectively have the same base context as a 5 tool setup, only the file tree get larger.
+Codecall ALSO only has 2 tools: `readFile` and `executeCode`, along with our SDK file tree of your tools (that we generate ahead of time) in context, so the agent only reads and gets the context it needs as needed based on the task, so this makes a 30 tool setup effectively have the same base context as a 5 tool setup (only the file tree get larger)
 
 ```typescript
 // Instead of 20+ inference passes and 90k+ tokens:
