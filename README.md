@@ -39,27 +39,13 @@ But doing this programmatically fixes this because it can just write code, as it
 users.filter((u) => u.role === "admin");
 ```
 
-### 5. Models were never trained for tool calling
-
-The special tokens used for tool calls (`<tool_call>`, `</tool_call>`) are synthetic training data. Models dont have much exposure to the tool calling syntax, and have only seen contrived examples from training sets... but they DO have:
-
-- Millions of lines of real world TypeScript
-- Lots of experience writing code to call APIs
-
-> “Making an LLM perform tasks with tool calling is like putting Shakespeare through a month-long class in Mandarin and then asking him to write a play in it. It’s just not going to be his best work.”  
-> — [Cloudflare Engineering](https://blog.cloudflare.com/code-mode/#whats-wrong-with-this)
-
-#### An example of a model that WAS trained to call tools
-
-Even though Grok 4 was heavily trained on tool calling. Result? It hallucinates tool call XML syntax in the middle of responses, writing the format but not triggering actual execution. The model “knows” the syntax exists but doesn’t use it correctly.
-
 ## The Solution
 
 Let models do what they're good at: **writing code**.
 
 LLMs have enormous amounts of real-world TypeScript in their training data. They're significantly better at writing code to call APIs than they are at the arbitrary JSON matching that tool calling requires.
 
-Codecall ALSO only has 2 tools: `readFile` and `executeCode`, along with our SDK file tree of your tools (that we generate ahead of time) in context, so the agent only reads and gets the context it needs as needed based on the task, so this makes a 30 tool setup effectively have the same base context as a 5 tool setup (only the file tree get larger)
+Codecall ALSO only has 2 tools: `readFile` and `executeCode`, along with our SDK file tree of your tools (that we generate ahead of time) in context, so the agent only reads and gets the context it needs as needed based on the task, so this makes a 30 tool setup effectively have the same base context as a 5 tool setup (only the file tree gets larger)
 
 ```typescript
 // Instead of 20+ inference passes and 90k+ tokens:
