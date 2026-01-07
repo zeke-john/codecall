@@ -89,9 +89,190 @@ return {
 
 Two inference passes. The code runs in a sandbox calling all 20 updates programmatically with step by step updates, only pulling the relevant context when it is needed, and returning only what is necessary. Saving tens of thousands worth of tokens, and doing everything more efficiently.
 
-## Get Started
+## Getting Started
 
-wip :)
+### Prerequisites
+
+- **Node.js** v20+ and npm
+- **Deno** v2+ (for sandbox execution) - [Install Deno](https://docs.deno.com/runtime/getting_started/installation/)
+- **OpenRouter API Key** (or any OpenRouter-compatible provider)
+
+Verify your installations:
+
+```bash
+node --version    # v20.0.0 or higher
+deno --version    # 2.0.0 or higher
+```
+
+### Installation
+
+```bash
+git clone https://github.com/zeke-john/codecall.git
+cd codecall
+npm install
+```
+
+### Environment Variables
+
+Create a `.env` file in the project root:
+
+```bash
+OPENROUTER_API_KEY=your_openrouter_api_key
+```
+
+Optional variables:
+
+```bash
+TODOIST_API_KEY=your_todoist_api_key    # For Todoist MCP integration
+MCP_PORT=4001                           # Custom port for demo MCP server
+```
+
+### Running the Demo MCP Server
+
+Codecall includes a demo MCP server with user management tools for testing. Start it in a separate terminal:
+
+```bash
+npm run mcp
+```
+
+This starts an HTTP MCP server at `http://localhost:4001/mcp` with 18 user management tools (create, update, delete, search, etc.) that operate on `demoMCP/users.json`.
+
+### Running the Codecall Agent
+
+With the demo MCP server running:
+
+```bash
+npm run codecall
+```
+
+This starts an interactive chat session using the Codecall approach (2 internal tools + SDK file tree). The agent will read SDK files on-demand and write code to execute tasks in a sandbox.
+
+### Running the Traditional Agent
+
+For comparison, run the traditional agent that exposes all tools directly:
+
+```bash
+npm run traditional
+```
+
+### Chat Commands
+
+Both agents support these commands:
+
+- `/exit` or `/quit` - Exit the chat
+- `/clear` - Clear conversation history
+- `/tools` - List all available tools
+
+### Connecting to Custom MCP Servers
+
+#### Option 1: Command Line Arguments
+
+Connect to stdio-based MCP servers:
+
+```bash
+npm run codecall -- --stdio namespace npx @some/mcp-server arg1 arg2
+```
+
+Connect to HTTP-based MCP servers:
+
+```bash
+npm run codecall -- --http namespace http://localhost:3000/mcp
+```
+
+Multiple servers:
+
+```bash
+npm run codecall -- \
+  --stdio todoist npx @doist/todoist-ai \
+  --http demo http://localhost:4001/mcp
+```
+
+#### Option 2: Modify Default Servers
+
+Edit `scripts/chat.ts` and modify the `getDefaultServers()` function:
+
+```typescript
+function getDefaultServers(): MCPServerEntry[] {
+  return [
+    {
+      namespace: "demo",
+      config: {
+        type: "http",
+        url: "http://localhost:4001/mcp",
+      },
+    },
+    {
+      namespace: "github",
+      config: {
+        type: "stdio",
+        command: "docker",
+        args: ["run", "-i", "--rm", "ghcr.io/github/github-mcp-server"],
+        env: { GITHUB_PERSONAL_ACCESS_TOKEN: process.env.GITHUB_TOKEN },
+      },
+    },
+  ];
+}
+```
+
+### Generating SDK Files from MCP Servers
+
+Before using Codecall with a new MCP server, generate SDK files:
+
+```bash
+# From an HTTP MCP server
+npm run test:mcp -- http http://localhost:4001/mcp
+
+# From a stdio MCP server
+npm run test:mcp -- stdio npx @doist/todoist-ai
+
+# With environment variables
+npm run test:mcp -- stdio npx @some/server --env API_KEY=xxx
+
+# Custom output directory
+npm run test:mcp -- http http://localhost:4001/mcp --output ./mysdks
+```
+
+SDK files are written to `generatedSdks/tools/{namespace}/`. see `docs/exampleSdkFile.ts` or any of the existing SDK files for the recommended format.
+
+### Scripts Reference
+
+| Script                | Command                                                    | Description                                    |
+| --------------------- | ---------------------------------------------------------- | ---------------------------------------------- |
+| `npm run codecall`    | `tsx scripts/chat.ts --codecall`                           | Run Codecall agent (programmatic tool calling) |
+| `npm run traditional` | `tsx scripts/chat.ts`                                      | Run traditional agent (direct tool calling)    |
+| `npm run mcp`         | `tsx demoMCP/index.ts`                                     | Start the demo MCP server                      |
+| `npm run test:mcp`    | `ts-node scripts/testMcpToSdk.ts`                          | Generate SDK files from MCP servers            |
+| `npm run inspect`     | `npx @modelcontextprotocol/inspector tsx demoMCP/index.ts` | Debug demo MCP with MCP Inspector              |
+| `npm run build`       | `tsc`                                                      | Compile TypeScript to `dist/`                  |
+
+### Dev Scripts :)
+
+For testing individual components:
+
+```bash
+# Test the sandbox execution
+npx tsx scripts/testSandbox.ts
+
+# Test the tool registry
+npx tsx scripts/testToolRegistry.ts
+```
+
+### Project Structure
+
+```
+codecall/
+├── src/
+│   ├── agents/           # Codecall and Traditional agent implementations
+│   ├── core/             # Sandbox, tool registry, internal tools
+│   ├── llm/              # OpenRouter client
+│   ├── mcp/              # MCP client and loader
+│   ├── sdk/              # SDK generator
+│   └── types/            # TypeScript type definitions
+├── scripts/              # CLI scripts for running agents
+├── demoMCP/              # Demo MCP server with user tools
+├── generatedSdks/        # Generated SDK files (tools/)
+└── docs/                 # Example SDK file format (more coming soon)
+```
 
 ## How Codecall Works
 
@@ -433,7 +614,7 @@ TypeScript also gives you:
 ### More stuff
 
 - [x] **Side By Side** - Using the same set of tools and a task, do a direct comparison w/ code call and a traditional agent
-- [ ] **Add a Setup section** - In this readme add a section to see how to get started
+- [x] **Add a Setup section** - In this readme add a section to see how to get started
 - [ ] **Documentation** - docs, usage examples, use cases, when to and not to use, etc
 - [ ] **NPM Package** - an npm package for codecall, down the road :)
 

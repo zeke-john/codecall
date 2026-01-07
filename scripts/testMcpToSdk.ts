@@ -127,43 +127,19 @@ async function main() {
   }
   console.log(`\nOutput: ${path.resolve(outputDir)}/tools`);
 
-  console.log("\n===========================================");
-  console.log("MANUAL UPDATES REQUIRED!");
-
-  console.log("\nAll SDK files need INPUT and OUTPUT examples added manually.");
-  console.log(
-    "Examples help the LLM understand expected data formats and write correct code consistently.\n"
-  );
-
   if (result.toolsMissingOutputSchema.length > 0) {
+    console.log("\n===========================================");
     console.log(
-      `${result.toolsMissingOutputSchema.length} tools need output interfaces AND input/output examples:`
+      `${result.toolsMissingOutputSchema.length} tools need output interfaces:`
     );
     for (const toolName of result.toolsMissingOutputSchema) {
       console.log(`  - ${toolNameToFileName(toolName)}`);
     }
     console.log(
-      "\nThese were defaulted to return Promise<unknown>. Please add an Output interface AND input/output examples."
+      "\nThese were defaulted to return Promise<unknown>. Please add an Output interface."
     );
+    console.log("===========================================\n");
   }
-
-  if (result.toolsWithOutputSchema.length > 0) {
-    console.log(
-      `${result.toolsWithOutputSchema.length} tools already have output interfaces.`
-    );
-    for (const toolName of result.toolsWithOutputSchema) {
-      console.log(`  - ${toolNameToFileName(toolName)}`);
-    }
-    console.log("Please add input/output examples to the SDK files.");
-  }
-
-  console.log("\n===========================================\n");
-  console.log(
-    "Please see a full example in docs/exampleSdkFile.ts for how a SDK file should look -> "
-  );
-  console.log(
-    "https://github.com/zeke-john/codecall/blob/main/docs/exampleSdkFile.ts"
-  );
 }
 
 main().catch(console.error);
