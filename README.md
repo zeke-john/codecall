@@ -16,7 +16,7 @@ Traditional tool calling has fundamental architectural issues that get worse at 
 
 ### 1. Context Bloat & Wasting Tokens
 
-Traditional agents send EVERY tool definition with every request, so for 20 tools thats about 10k+ tokens of schema definitions in every inference call, even for questions like, "what can you do?" or "update the date for this" where they are not necessary. This issue scales with tool count and gets multiplied by every step within a turn AND every turn in the conversation.
+Traditional agents send EVERY tool definition with every request, so for 20 tools thats about 6k+ tokens of schema definitions in every inference call, even for questions like, "what can you do?" or "update the date for this" where they are not necessary. This issue scales with tool count and gets multiplied with every turn in a conversation.
 
 ### 2. N Inference Calls for N Tool Operations
 
@@ -422,7 +422,7 @@ TypeScript also gives you:
 - [x] **Add internal tools** - Expose the `readFile` and `executeCode` tools to Agent
 - [x] **Normal agent loop** - handle LLM messages and tool calls w/ streaming, just a normal agent loop w/ open router
 - [x] **System prompt** - guide the LLM to explore SDK files, write code and etc
-- [] add warning for destrtive tools in code scripts the user can type y/n if they want to continue
+- [ ] add warning for destructive tools in code scripts, the user can type y/n if they want to continue (we also give a reason)
 
 ### More stuff
 
