@@ -10,9 +10,9 @@ _74.7% fewer tokens · 92.3% fewer tool calls_
 
 https://www.loom.com/share/e6278a09c22549198e88f8039fa50345
 
-## The Problem
+## Problems with Traditional Agents
 
-Traditional tool calling has fundamental architectural issues that get worse at scale:
+Traditional tool calling in agents has many fundamental architectural issues that get worse at scale:
 
 ### 1. Context Bloat & Wasting Tokens
 
@@ -36,7 +36,7 @@ But doing this programmatically fixes this because it can just write code, as it
 users.filter((u) => u.role === "admin");
 ```
 
-## The Solution
+## Our Approach
 
 Let models do what they're good at: **writing code**.
 
@@ -88,6 +88,10 @@ return {
 ```
 
 Two inference passes. The code runs in a sandbox calling all 20 updates programmatically with step by step updates, only pulling the relevant context when it is needed, and returning only what is necessary. Saving tens of thousands worth of tokens, and doing everything more efficiently.
+
+## Get Started
+
+wip :)
 
 ## How Codecall Works
 
@@ -323,7 +327,7 @@ This approach makes sure that the agent sees clean, well-typed TypeScript interf
 
 Codecall also has a self-learning system that automatically improves the SDK documentation we generate when the agents recover from tool call errors. Unlike traditional agents that repeat the same mistakes across sessions, Codecall builds memory for what not to do that compounds over time by updating the actual SDK Files.
 
-Because Codecall writes code that strings together multiple tool calls into a single script to do the user's task, it becomes a lot more important for the tools not to fail, because even small input schema issue, or assuming the output shape it different, or guessing the wrong semantics would cause the entire script to fail, and for the agent to re-write it and fix it.
+Because Codecall writes code that strings together multiple tool calls into a single script to do the user's task, it becomes a lot more important for the tools not to fail, because even small input schema issue, assuming the output shape it different, or guessing the wrong semantics would cause the entire script to fail, and for the agent to re-write it and fix it.
 
 ##### The Flow
 
@@ -334,7 +338,9 @@ Because Codecall writes code that strings together multiple tool calls into a si
 // Error: "At least one filter must be provided..."
 ```
 
-After fixing the issue in that run, the agent automatically updates the SDK file that was unclear (which led to the issue) with this at the top:
+After fixing the issue in that run, the agent automatically updates the SDK file that was unclear (which led to the issue) with this at the top...
+
+So in `todoist/findTasks.ts` it adds:
 
 ```typescript
 /**
@@ -350,16 +356,16 @@ After fixing the issue in that run, the agent automatically updates the SDK file
  */
 ```
 
-**Next agent** reads that same SDK file, and sees the banner immediately:
+**Next agent** reads that same SDK file, and sees the banner for the learned constraint immediately:
 
 ```typescript
 // Agent reads: tools/todoist/findTasks.ts
 // Sees the @CC LEARNED CONSTRAINT banner at the top
 // Writes correct code from the start:
-const tasks = await tools.todoist.findTasks({ projectId: "12345" });
+const tasks = await tools.todoist.findTasks({ projectId: "blah blah blah" });
 ```
 
-So no error, no retry, and no wasted inference. The learned constraint prevents the same mistake entirely.
+So no error and no wasted inference. The learned constraint form the previous agent prevents the same mistake entirely.
 
 ### Progress Updates
 
@@ -367,7 +373,7 @@ The model uses `progress()` to provide real time feedback while a script in bein
 
 The sandbox uses stdout as an IPC channel and not a log stream, so each line is parsed as a JSON and routed based on its `type` field. A normal `console.log("hi")` isn't valid protocol JSON, so the sandbox ignores it.
 
-`progress(data)` wraps your data in the correct format (`{ type: "progress", data }`) so it gets captured, stored in `progressLogs`, and forwarded to the `onProgress` callback.
+`progress(data)` wraps your data in the correct format: `{ type: "progress", data }` so it gets captured, stored in `progressLogs`, and forwarded to the `onProgress` callback.
 
 #### Example
 
@@ -389,7 +395,7 @@ progress({ step: "Complete", revoked: admins.length });
 return { adminsProcessed: admins.length };
 ```
 
-This keeps the UX of a step-by-step agent with user-facing updates while still getting the cost and speed benefits of single-pass execution.
+This keeps the UX of a step by step agent with user facing updates while the script is running, while still getting the cost and speed benefits of a single pass execution.
 
 ## Why TypeScript?
 
@@ -422,13 +428,14 @@ TypeScript also gives you:
 - [x] **Add internal tools** - Expose the `readFile` and `executeCode` tools to Agent
 - [x] **Normal agent loop** - handle LLM messages and tool calls w/ streaming, just a normal agent loop w/ open router
 - [x] **System prompt** - guide the LLM to explore SDK files, write code and etc
-- [ ] add warning for destructive tools in code scripts, the user can type y/n if they want to continue (we also give a reason)
+- [ ] **"Are you sure" option w/ Reason** - add a warning for destructive tools in code scripts, the user can type y/n if they want to continue (we also give a reason)
 
 ### More stuff
 
 - [x] **Side By Side** - Using the same set of tools and a task, do a direct comparison w/ code call and a traditional agent
-- [ ] **Documentation** - docs and usage examples
-- [ ] **NPM Package** - an npm package for codecall (down the road)
+- [ ] **Add a Setup section** - In this readme add a section to see how to get started
+- [ ] **Documentation** - docs, usage examples, use cases, when to and not to use, etc
+- [ ] **NPM Package** - an npm package for codecall, down the road :)
 
 ## Contributing
 
