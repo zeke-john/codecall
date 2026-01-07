@@ -99,13 +99,6 @@ Three inference passes. The code runs in a sandbox calling all 20 updates progra
 - **Deno** v2+ (for sandbox execution) - [Install Deno](https://docs.deno.com/runtime/getting_started/installation/)
 - **OpenRouter API Key** (or any OpenRouter compatible provider)
 
-Verify your installations:
-
-```bash
-node --version    # v20.0.0 or higher
-deno --version    # 2.0.0 or higher
-```
-
 ### Clone the repo
 
 ```bash
@@ -125,7 +118,7 @@ OPENROUTER_API_KEY=your_openrouter_api_key
 Optional variables:
 
 ```bash
-TODOIST_API_KEY=your_todoist_api_key    # For Todoist MCP integration
+TODOIST_API_KEY=your_todoist_api_key    # For Todoist the todoist MCP
 MCP_PORT=4001                           # Custom port for demo MCP server
 ```
 
@@ -236,22 +229,15 @@ npm run test:mcp -- http http://localhost:4001/mcp --output ./mysdks
 
 SDK files are written to `generatedSdks/tools/{namespace}/`. see `docs/exampleSdkFile.ts` or any of the existing SDK files for the recommended format.
 
-### Scripts Reference
-
-| Script                | Command                                                    | Description                                    |
-| --------------------- | ---------------------------------------------------------- | ---------------------------------------------- |
-| `npm run codecall`    | `tsx scripts/chat.ts --codecall`                           | Run Codecall agent (programmatic tool calling) |
-| `npm run traditional` | `tsx scripts/chat.ts`                                      | Run traditional agent (direct tool calling)    |
-| `npm run mcp`         | `tsx demoMCP/index.ts`                                     | Start the demo MCP server                      |
-| `npm run test:mcp`    | `ts-node scripts/testMcpToSdk.ts`                          | Generate SDK files from MCP servers            |
-| `npm run inspect`     | `npx @modelcontextprotocol/inspector tsx demoMCP/index.ts` | Debug demo MCP with MCP Inspector              |
-| `npm run build`       | `tsc`                                                      | Compile TypeScript to `dist/`                  |
-
 ### Dev Scripts :)
 
-For testing individual components:
+For Observability & testing individual components:
 
 ```bash
+
+# Debugs the demo MCP server using the MCP Inspector
+npm run inspect
+
 # Test the sandbox execution
 npx tsx scripts/testSandbox.ts
 
