@@ -542,7 +542,7 @@ So no error and no wasted inference. The learned constraint form the previous ag
 
 ### Progress Updates
 
-The model uses `progress()` to provide real time feedback while a script in being executed. This gives users visibility into what's happening without requiring multiple `executeCode()` calls like normal tools calls... essentially a console.log wrapper
+The model uses `progress()` to provide real time feedback while a script in being executed. This gives users visibility into what's happening without requiring multiple `executeCode()` calls like normal tools calls.
 
 The sandbox uses stdout as an IPC channel and not a log stream, so each line is parsed as a JSON and routed based on its `type` field. A normal `console.log("hi")` isn't valid protocol JSON, so the sandbox ignores it.
 
