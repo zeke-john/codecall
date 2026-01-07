@@ -481,14 +481,18 @@ From the code's perspective this behaves exactly like calling a normal async fun
 
 As mentioned above, Codecall converts MCP tool definitions into TypeScript SDK files so it's clearer to reference when writing code. So when you connect an MCP server, Codecall:
 
-1. **Extracts tool definitions** - Reads all tools from the MCP server, including their `inputSchema`, `outputSchema`, descriptions, annotations (readOnly, destructive, idempotent), and execution hints
-2. **Generates TypeScript SDK files** - Uses Gemini 3 Flash to the convert JSON Schema definitions into well-typed TypeScript files with:
+1. Reads all tools from the MCP server, including their `inputSchema`, `outputSchema`, descriptions, annotations (readOnly, destructive, idempotent), and execution hints
+
+2. Uses Gemini 3 Flash to the convert JSON Schema definitions into well-typed TypeScript files with:
+
    - Complete type definitions for inputs and outputs
    - JSDoc comments with descriptions, defaults, and validation constraints
    - Proper handling of enums, optional fields, and nested objects
    - Success/error response types when output schemas are provided
-3. **Organizes by namespace** - Groups tools into folders (e.g., `tools/database/`, `tools/todoist/`) based on the MCP server name
-4. **Writes to disk** - Saves all SDK files to `generatedSdks/tools/{namespace}/` for the agent to discover and read on-demand
+
+3. Groups tools into folders (e.g., `tools/database/`, `tools/todoist/`) based on the MCP server name
+
+4. Saves all SDK files to `generatedSdks/tools/{namespace}/` for the agent to discover and read on-demand
 
 This approach makes sure that the agent sees clean, well-typed TypeScript interfaces and schemas instead of raw JSON schemas, making it easier for the model to write correct code. The SDK files are also self-documenting with JSDoc comments that capture all the metadata from the original tool definitions, and that it can be edited in the future.
 
@@ -538,7 +542,7 @@ So no error and no wasted inference. The learned constraint form the previous ag
 
 ### Progress Updates
 
-The model uses `progress()` to provide real time feedback while a script in being executed. This gives users visibility into what's happening without requiring multiple `executeCode()` calls like normal tools calls.
+The model uses `progress()` to provide real time feedback while a script in being executed. This gives users visibility into what's happening without requiring multiple `executeCode()` calls like normal tools calls... essentially a console.log wrapper
 
 The sandbox uses stdout as an IPC channel and not a log stream, so each line is parsed as a JSON and routed based on its `type` field. A normal `console.log("hi")` isn't valid protocol JSON, so the sandbox ignores it.
 
