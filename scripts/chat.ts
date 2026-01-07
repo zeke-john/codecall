@@ -56,6 +56,16 @@ function formatToolResult(result: unknown, toolName: string): string {
       parts.push(`Error: ${obj.error}`);
     }
 
+    const progressLogs = obj.progressLogs as unknown[] | undefined;
+    if (progressLogs && progressLogs.length > 0) {
+      parts.push("");
+      parts.push("Progress Logs:");
+      for (const log of progressLogs) {
+        const logStr = typeof log === "string" ? log : JSON.stringify(log);
+        parts.push(`  - ${logStr}`);
+      }
+    }
+
     if (obj.output !== undefined) {
       parts.push("");
       parts.push("Output:");
