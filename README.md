@@ -89,7 +89,7 @@ return {
 };
 ```
 
-Two inference passes. The code runs in a sandbox calling all 20 updates programmatically with step by step updates, only pulling the relevant context when it is needed, and returning only what is necessary. Saving tens of thousands worth of tokens, and doing everything more efficiently.
+Three inference passes. The code runs in a sandbox calling all 20 updates programmatically with step by step updates, only pulling the relevant context when it is needed, and returning only what is necessary. Saving tens of thousands worth of tokens, and doing everything more efficiently.
 
 ## Getting Started
 
