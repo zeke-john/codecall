@@ -2,16 +2,13 @@
 
 > An Open Source Typescript implementation of Programmatic Tool Calling for AI Agents.
 
-Codecall changes how agents interact with tools by letting them **write and execute code** (in sandboxes) that orchestrates multiple tool calls programmatically to do a task, rather than making individual tool calls that bloat the context and increase the token usage like in traditional agents
+Codecall changes how agents interact with tools by letting them **write and execute code** (in secured sandboxes) that orchestrates multiple tools programmatically (like an API) to do a task, rather than making individual tool calls that bloat the context and increase the token usage like in traditional agents
 
-This works with both **MCP servers** (http streaming, stdio) and **standard tool definitions**.
+**Demo (Codecall vs a Traditional Agent performing the same task)** →
 
-> [!NOTE]
-> **Before reading** :)
->
-> Please keep in mind all of this is the **future plan** for Codecall and how it will work. Codecall is still a WIP and not production ready.
->
-> If you're interested in contributing or following the project, check back soon or open an issue to discuss ideas!
+_74.7% fewer tokens · 92.3% fewer tool calls_
+
+https://www.loom.com/share/e6278a09c22549198e88f8039fa50345
 
 ## The Problem
 
@@ -429,7 +426,7 @@ TypeScript also gives you:
 
 ### More stuff
 
-- [ ] **Side By Side** - Using the same set of tools and a task, do a direct comparison w/ code call and a traditional agent
+- [x] **Side By Side** - Using the same set of tools and a task, do a direct comparison w/ code call and a traditional agent
 - [ ] **Documentation** - docs and usage examples
 - [ ] **NPM Package** - an npm package for codecall (down the road)
 
