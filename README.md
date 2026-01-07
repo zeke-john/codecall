@@ -2,7 +2,7 @@
 
 > An Open Source Typescript implementation of Programmatic Tool Calling for AI Agents.
 
-Codecall changes how agents interact with tools by letting them **write and execute code** (in secured sandboxes) that orchestrates multiple tools programmatically (like an API) to do a task, rather than making individual tool calls that bloat the context and increase the token usage like in traditional agents
+Codecall changes how agents interact with tools by letting them **write and execute code** (in secured sandboxes) that orchestrates multiple tools programmatically (like an API) to do a task, rather than making individual tool calls that bloat the context and increase the token usage like in traditional agents. Codecall also has progressive tool discovery & error handling!
 
 **Demo (Codecall vs a Traditional Agent performing the same task)** →
 
