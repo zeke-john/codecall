@@ -95,7 +95,7 @@ Two inference passes. The code runs in a sandbox calling all 20 updates programm
 
 - **Node.js** v20+ and npm
 - **Deno** v2+ (for sandbox execution) - [Install Deno](https://docs.deno.com/runtime/getting_started/installation/)
-- **OpenRouter API Key** (or any OpenRouter-compatible provider)
+- **OpenRouter API Key** (or any OpenRouter compatible provider)
 
 Verify your installations:
 
