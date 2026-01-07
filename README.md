@@ -10,7 +10,7 @@ _74.7% fewer tokens · 92.3% fewer tool calls_
 
 <!-- demo-video -->
 
-https://github.com/zeke-john/codecall/blob/main/demo.mp4
+https://github.com/zeke-john/codecall/blob/main/demo-fixed.mp4
 
 <!-- demo-video -->
 
