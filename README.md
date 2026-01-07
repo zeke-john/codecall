@@ -229,7 +229,7 @@ npm run test:mcp -- http http://localhost:4001/mcp --output ./mysdks
 
 SDK files are written to `generatedSdks/tools/{namespace}/`. see `docs/exampleSdkFile.ts` or any of the existing SDK files for the recommended format.
 
-### Dev Scripts :)
+### Dev Scripts
 
 For Observability & testing individual components:
 
