@@ -104,7 +104,7 @@ node --version    # v20.0.0 or higher
 deno --version    # 2.0.0 or higher
 ```
 
-### Installation
+### Clone the repo
 
 ```bash
 git clone https://github.com/zeke-john/codecall.git
