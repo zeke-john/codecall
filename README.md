@@ -8,7 +8,7 @@ Codecall changes how agents interact with tools by letting them **write and exec
 
 _74.7% fewer tokens · 92.3% fewer tool calls_
 
-https://www.loom.com/share/e6278a09c22549198e88f8039fa50345
+https://github.com/zeke-john/codecall/blob/main/demo.mp4
 
 Hacker News Post -> https://news.ycombinator.com/item?id=46524178
 
