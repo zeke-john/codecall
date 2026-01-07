@@ -4,9 +4,9 @@
 
 Codecall changes how agents interact with tools by letting them **write and execute code** (in secured sandboxes) that orchestrates multiple tools programmatically (like an API) to do a task, rather than making individual tool calls that bloat the context and increase the token usage like in traditional agents. Codecall also has progressive tool discovery & error handling!
 
-## **Demo** →
+**Demo** →
 
-**Codecall** vs a **Traditional Agent** performing the same task w/ the same tools
+Codecall vs a Traditional Agent performing the same task w/ the same tools
 
 _74.7% fewer tokens · 92.3% fewer tool calls_
 
