@@ -56,53 +56,6 @@ export type CloneUserOutput =
   | { success: true; data: CloneUserSuccessData }
   | { success: false; error: CloneUserError };
 
-/**
- * Create a copy of an existing user with a new email address.
- *
- * SUCCESS RESPONSE EXAMPLE:
- * {
- *   "success": true,
- *   "data": {
- *     "clonedUser": {
- *       "id": 21,
- *       "name": "John Doe",
- *       "email": "new@email.com",
- *       "address": "123 Main St",
- *       "phone": "555-1234",
- *       "favoriteColor": "blue",
- *       "isActive": true,
- *       "createdAt": "2026-01-03T12:00:00.000Z"
- *     },
- *     "sourceUser": {
- *       "id": 1,
- *       "name": "John Doe",
- *       "email": "john@example.com",
- *       "address": "123 Main St",
- *       "phone": "555-1234",
- *       "favoriteColor": "blue",
- *       "isActive": true,
- *       "createdAt": "2025-03-15T00:00:00.000Z"
- *     }
- *   }
- * }
- *
- * ERROR RESPONSE EXAMPLES:
- * {
- *   "success": false,
- *   "error": {
- *     "code": "USER_NOT_FOUND",
- *     "message": "Source user with id 999 not found"
- *   }
- * }
- *
- * {
- *   "success": false,
- *   "error": {
- *     "code": "EMAIL_EXISTS",
- *     "message": "Email new@email.com is already in use"
- *   }
- * }
- */
 export async function cloneUser(
   input: CloneUserInput
 ): Promise<CloneUserOutput>;
