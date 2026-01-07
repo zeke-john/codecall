@@ -10,6 +10,10 @@ _74.7% fewer tokens · 92.3% fewer tool calls_
 
 https://www.loom.com/share/e6278a09c22549198e88f8039fa50345
 
+Hacker News Post :)
+
+https://news.ycombinator.com/item?id=46524178
+
 ## Problems with Traditional Agents
 
 Traditional tool calling in agents has many fundamental architectural issues that get worse at scale:
