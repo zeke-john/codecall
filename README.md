@@ -46,6 +46,8 @@ LLMs have enormous amounts of real-world TypeScript in their training data. They
 
 Codecall ALSO only has 2 tools: `readFile` and `executeCode`, along with our SDK file tree of your tools (that we generate ahead of time) in context, so the agent only reads and gets the context it needs as needed based on the task, so this makes a 30 tool setup effectively have the same base context as a 5 tool setup (only the file tree gets larger)
 
+When code in the sandbox calls `tools.namespace.method()` a Proxy intercepts it, sends a JSON message via stdout to the host process, which routes it through ToolRegistry to execute the actual tool, then sends the result back via stdin where the sandbox resolves the waiting Promise, making IPC look like normal async function calls.
+
 ```typescript
 // Instead of 20+ inference passes and 90k+ tokens:
 const allUsers = await tools.users.listAllUsers();
@@ -484,7 +486,6 @@ As mentioned above, Codecall converts MCP tool definitions into TypeScript SDK f
 1. Reads all tools from the MCP server, including their `inputSchema`, `outputSchema`, descriptions, annotations (readOnly, destructive, idempotent), and execution hints
 
 2. Uses Gemini 3 Flash to the convert JSON Schema definitions into well-typed TypeScript files with:
-
    - Complete type definitions for inputs and outputs
    - JSDoc comments with descriptions, defaults, and validation constraints
    - Proper handling of enums, optional fields, and nested objects
