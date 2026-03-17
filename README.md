@@ -12,7 +12,7 @@ _74.7% fewer tokens · 92.3% fewer tool calls_
 
 https://github.com/user-attachments/assets/6cfc44e4-784a-4258-97d6-6ae694ef4024
 
-## Problems with Traditional Agents
+## Problems w/ Traditional Agents
 
 Traditional tool calling in agents has many fundamental architectural issues that get worse at scale:
 
