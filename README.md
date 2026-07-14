@@ -380,59 +380,6 @@ When the model calls `executeCode()`, Codecall runs that code inside a fresh, sh
 
 By default, the sandboxed code has no access to the filesystem, network, environment variables, or system processes. The only way it can interact with the outside world is by calling the tool functions exposed through tools (which are forwarded by Codecall to the MCP server).
 
-#### Sandbox Lifecycle
-
-```
-┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│   ┌─────────┐       ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐         │
-│   │  SPAWN  │────--▶│  INJECT │────▶│ EXECUTE │────▶│ CAPTURE │────▶│ DESTROY │         │
-│   └─────────┘       └─────────┘     └─────────┘     └─────────┘     └─────────┘         │
-│        │                 │               │               │               │              │
-│        ▼                 ▼               ▼               ▼               ▼              │
-│   Fresh Deno       tools proxy     Run generated    Collect return   Terminate          │
-│   process with     + progress()    TypeScript       value or error   process,           │
-│   deny-by-default  injected        code             + progress logs  cleanup            │
-│   (Deno 2)                                                                              │
-│                                                                                         │
-└─────────────────────────────────────────────────────────────────────────────────────────┘
-```
-
-#### Data Flow
-
-```
-┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                                                                                         │
-│    SANDBOX                        TOOL BRIDGE                         MCP SERVER        │
-│       │                               │                                    │            │
-│       │  tools.users.listAllUsers()   │                                    │            │
-│       │ ─────────────────────────────▶│                                    │            │
-│       │                               │                                    │            │
-│       │                               │   tools/call: listAllUsers         │            │
-│       │                               │ ──────────────────────────────────▶│            │
-│       │                               │                                    │            │
-│       │                               │          [{ id, name, role }, ...] │            │
-│       │                               │ ◀──────────────────────────────────│            │
-│       │                               │                                    │            │
-│       │   Promise<User[]> resolved    │                                    │            │
-│       │ ◀─────────────────────────────│                                    │            │
-│       │                               │                                    │            │
-│       │  (code continues execution)   │                                    │            │
-│       │                               │                                    │            │
-│       │  progress({ step: "Done" })   │                                    │            │
-│       │ ─────────────────────────────▶│                                    │            │
-│       │                               │                                    │            │
-│       │                          Streams to UI                             │            │
-│       │                               │                                    │            │
-│       │  return { success: true }     │                                    │            │
-│       │ ─────────────────────────────▶│                                    │            │
-│       │                               │                                    │            │
-│       │                     Result sent to Model                           │            │
-│       │                     for response generation                        │            │
-│       │                               │                                    │            │
-│                                       ▼                                                 │
-└─────────────────────────────────────────────────────────────────────────────────────────┘
-```
-
 ### How Tool Calls Work at Runtime
 
 When the generated code runs, Codecall injects a `tools` Proxy into the sandbox.
