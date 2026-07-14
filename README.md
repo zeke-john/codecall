@@ -38,7 +38,7 @@ But doing this programmatically fixes this because it can just write code, as it
 users.filter((u) => u.role === "admin");
 ```
 
-## Our Approach
+  ## Codecall's Approach
 
 Let models do what they're good at: **writing code**.
 
@@ -245,23 +245,6 @@ npx tsx scripts/testSandbox.ts
 
 # Test the tool registry
 npx tsx scripts/testToolRegistry.ts
-```
-
-### Project Structure
-
-```
-codecall/
-├── src/
-│   ├── agents/           # Codecall and Traditional agent implementations
-│   ├── core/             # Sandbox, tool registry, internal tools
-│   ├── llm/              # OpenRouter client
-│   ├── mcp/              # MCP client and loader
-│   ├── sdk/              # SDK generator
-│   └── types/            # TypeScript type definitions
-├── scripts/              # CLI scripts for running agents
-├── demoMCP/              # Demo MCP server with user tools
-├── generatedSdks/        # Generated SDK files (tools/)
-└── docs/                 # Example SDK file format (more coming soon)
 ```
 
 ## How Codecall Works
